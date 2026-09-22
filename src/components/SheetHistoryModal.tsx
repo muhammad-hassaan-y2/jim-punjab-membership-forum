@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { 
   History, 
@@ -17,7 +17,9 @@ import {
   Sparkles,
   Download,
   Printer,
-  Share2
+  Share2,
+  Pencil,
+  Check
 } from 'lucide-react';
 import { exportTransactionsToExcel, printSheetAsPDF } from '../utils/exportUtils';
 
@@ -34,9 +36,13 @@ export const SheetHistoryModal: React.FC = () => {
     categories,
     createRawBlankSheet, 
     createTemplateSheet, 
+    renameSheetTab,
     language,
     orgConfig
   } = useFinance();
+
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
 
   const isUrdu = language === 'ur';
 
@@ -155,9 +161,58 @@ export const SheetHistoryModal: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                          {tab.name}
-                        </h4>
+                        {editingTabId === tab.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  if (editName.trim()) renameSheetTab(tab.id, editName.trim());
+                                  setEditingTabId(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingTabId(null);
+                                }
+                              }}
+                              className="px-2 py-0.5 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-md outline-none w-36 sm:w-48"
+                            />
+                            <button
+                              onClick={() => {
+                                if (editName.trim()) renameSheetTab(tab.id, editName.trim());
+                                setEditingTabId(null);
+                              }}
+                              className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                              title="Save name"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setEditingTabId(null)}
+                              className="p-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                              {tab.name}
+                            </h4>
+                            <button
+                              onClick={() => {
+                                setEditingTabId(tab.id);
+                                setEditName(tab.name);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 p-0.5 transition-opacity"
+                              title="Rename this sheet"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                         {isCurrent && (
                           <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold">
                             Active

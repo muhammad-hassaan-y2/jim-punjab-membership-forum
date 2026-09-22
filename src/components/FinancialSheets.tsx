@@ -23,7 +23,8 @@ import {
   Grid3X3,
   TableProperties,
   Share2,
-  Check
+  Check,
+  Pencil
 } from 'lucide-react';
 import { Transaction, SheetTab } from '../types/finance';
 import { 
@@ -63,12 +64,54 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     clearAllTransactions,
     setIsPeriodicModalOpen,
     setIsHistoryModalOpen,
+    renameSheetTab,
   } = useFinance();
 
   // Active Sheet Tab filter & Sheet Number
   const currentSheetIndex = sheetTabs.findIndex(t => t.id === activeSheetTabId);
   const currentSheetNumber = currentSheetIndex >= 0 ? currentSheetIndex + 1 : 1;
   const currentSheetTab = sheetTabs.find(t => t.id === activeSheetTabId);
+
+  // Sheet Renaming State & Handlers
+  const [isEditingSheetName, setIsEditingSheetName] = useState(false);
+  const [sheetNameInput, setSheetNameInput] = useState('');
+  const currentSheetTitle = currentSheetTab?.name || `Sheet ${currentSheetNumber}`;
+
+  const handleStartRename = () => {
+    setSheetNameInput(currentSheetTitle);
+    setIsEditingSheetName(true);
+  };
+
+  const handleSaveRename = async () => {
+    const trimmed = sheetNameInput.trim();
+    if (trimmed && trimmed !== currentSheetTitle) {
+      renameSheetTab(activeSheetTabId, trimmed);
+      try {
+        localStorage.setItem(`jamia_sheet_name_${activeSheetTabId}`, trimmed);
+        await fetch(`/api/shared/${activeSheetTabId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: trimmed,
+            data: rawGridData,
+            rowCount: rawRowCount
+          })
+        });
+      } catch (err) {
+        console.error('Error saving renamed sheet to DB:', err);
+      }
+    }
+    setIsEditingSheetName(false);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveRename();
+    } else if (e.key === 'Escape') {
+      setIsEditingSheetName(false);
+    }
+  };
 
   // Dual View Mode: Raw Google Sheet / Excel (A-Z) vs 9-Column Template
   const [viewModeOverride, setViewModeOverride] = useState<'raw' | 'template' | null>(null);
@@ -509,9 +552,45 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
-                    Sheet {currentSheetNumber}
-                  </h2>
+                  {isEditingSheetName ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={sheetNameInput}
+                        onChange={(e) => setSheetNameInput(e.target.value)}
+                        onKeyDown={handleRenameKeyDown}
+                        onBlur={handleSaveRename}
+                        className="px-2.5 py-1 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-lg outline-none shadow-xs w-40 sm:w-56"
+                        placeholder="Enter sheet name..."
+                      />
+                      <button
+                        onMouseDown={(e) => { e.preventDefault(); handleSaveRename(); }}
+                        className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                        title="Save sheet name"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onMouseDown={(e) => { e.preventDefault(); setIsEditingSheetName(false); }}
+                        className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-colors"
+                        title="Cancel"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 group">
+                      <h2 
+                        onClick={handleStartRename}
+                        className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 py-0.5 px-1 -mx-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                        title="Click to rename this sheet"
+                      >
+                        <span>{currentSheetTitle}</span>
+                        <Pencil className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 text-slate-400 group-hover:text-blue-600 transition-opacity" />
+                      </h2>
+                    </div>
+                  )}
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300">
                     {isRawMode ? 'Raw Excel / Google Grid' : 'Institutional Ledger'}
                   </span>
