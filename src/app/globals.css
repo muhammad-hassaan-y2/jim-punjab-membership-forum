@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-elevated: #f1f5f9;
+    --border-color: #e2e8f0;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --accent-primary: #0284c7;
+    --accent-secondary: #0369a1;
+    --accent-gold: #d97706;
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Emerald Theme */
+  .theme-green {
+    --bg-primary: #f0fdf4;
+    --bg-surface: #ffffff;
+    --bg-elevated: #dcfce7;
+    --border-color: #bbf7d0;
+    --text-main: #064e3b;
+    --text-muted: #047857;
+    --accent-primary: #059669;
+    --accent-secondary: #047857;
+    --accent-gold: #d97706;
+    --card-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.1);
+  }
+
+  /* Royal Blue Theme */
+  .theme-blue {
+    --bg-primary: #f0f7ff;
+    --bg-surface: #ffffff;
+    --bg-elevated: #e0f2fe;
+    --border-color: #bae6fd;
+    --text-main: #0c4a6e;
+    --text-muted: #0369a1;
+    --accent-primary: #0284c7;
+    --accent-secondary: #006699;
+    --accent-gold: #eab308;
+    --card-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.12);
+  }
+
+  /* Obsidian Black & Luxury Gold Theme */
+  .theme-black-gold {
+    --bg-primary: #090a0f;
+    --bg-surface: #11141d;
+    --bg-elevated: #1a1f2c;
+    --border-color: #2e384d;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-primary: #d4af37;
+    --accent-secondary: #f6d365;
+    --accent-gold: #d4af37;
+    --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px -3px rgba(212, 175, 55, 0.15);
+  }
+}
+
+/* Nastaliq Urdu styling */
+.font-nastaliq {
+  font-family: 'Noto Nastaliq Urdu', 'Amiri', serif;
+  line-height: 2;
+}
+
+.font-arabic-title {
+  font-family: 'Amiri', 'Noto Nastaliq Urdu', serif;
+}
+
+/* Custom Ornate Geometric Border for the Islamic Voucher */
+.voucher-ornate-border {
+  border: 12px solid #0088cc;
+  border-image: repeating-linear-gradient(45deg, #0088cc, #0088cc 8px, #ffffff 8px, #ffffff 16px, #00a8e8 16px, #00a8e8 24px) 16;
+}
+
+.theme-green .voucher-ornate-border {
+  border-color: #059669;
+  border-image: repeating-linear-gradient(45deg, #059669, #059669 8px, #ffffff 8px, #ffffff 16px, #10b981 16px, #10b981 24px) 16;
+}
+
+.theme-black-gold .voucher-ornate-border {
+  border-color: #d4af37;
+  border-image: repeating-linear-gradient(45deg, #d4af37, #d4af37 8px, #11141d 8px, #11141d 16px, #f6d365 16px, #f6d365 24px) 16;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: transparent !important;
+    color: #000000 !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .voucher-print-container {
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-inside: avoid;
+    width: 100% !important;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.theme-black-gold ::-webkit-scrollbar-track {
+  background: #090a0f;
+}
+.theme-black-gold ::-webkit-scrollbar-thumb {
+  background: #2e384d;
+}
