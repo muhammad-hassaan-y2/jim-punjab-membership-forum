@@ -5,430 +5,202 @@ import { useFinance } from '../context/FinanceContext';
 import { 
   FileSpreadsheet, 
   Receipt, 
-  BarChart3, 
-  Users, 
-  Download, 
+  Database, 
   ShieldCheck, 
-  Sparkles, 
+  Scale, 
   ArrowRight, 
-  Coins, 
   CheckCircle2, 
-  Printer, 
-  Languages, 
-  Palette,
-  TrendingUp,
-  WalletCards,
-  Calendar,
-  Clock,
-  Database,
-  BookOpen,
-  Scale,
-  Building,
-  CheckCircle,
-  PlusCircle,
+  LayoutDashboard,
   Layers,
-  FileText,
-  History,
-  FileCheck,
-  LayoutDashboard
+  Coins,
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
-import { PrintableVoucher } from './PrintableVoucher';
-import { exportTransactionsToExcel } from '../utils/exportUtils';
 
 export const LandingPage: React.FC = () => {
   const { 
-    theme, 
-    language, 
     setActiveTab, 
     orgConfig, 
     categories, 
     transactions, 
     sheetTabs,
-    totalIncome, 
-    totalExpense, 
-    netBalance, 
-    activeReceiptTransaction,
-    donorsSummary,
-    createRawBlankSheet,
-    createTemplateSheet,
-    setIsPeriodicModalOpen,
-    setIsHistoryModalOpen,
     dbStatus,
     dbLatency
   } = useFinance();
 
-  const isUrdu = language === 'ur';
-
-  // Quick stats
-  const zakatTotal = transactions
-    .filter(t => t.categoryId === 'zakat' && t.type === 'income')
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-  const handleOpenRawSheet = () => {
-    createRawBlankSheet();
-    setActiveTab('sheets');
-  };
-
   return (
-    <div className="space-y-12 pb-16">
-      
-      {/* HERO SECTION: ACCOUNTING & RECORD KEEPING FOCUS */}
-      <section className="relative overflow-hidden rounded-3xl p-5 sm:p-8 md:p-12 lg:p-16 border shadow-2xl transition-all duration-300"
+    <div className="pb-8">
+      {/* EXCLUSIVE IN-DEPTH HERO SECTION */}
+      <section 
+        className="relative overflow-hidden rounded-3xl sm:rounded-4xl border border-emerald-500/20 shadow-2xl p-6 sm:p-10 md:p-14 lg:p-16 transition-all duration-300"
         style={{
-          background: theme === 'black-gold' 
-            ? 'radial-gradient(ellipse at 80% 20%, rgba(212, 175, 55, 0.15), transparent 60%), linear-gradient(135deg, #0d1117 0%, #161b26 100%)' 
-            : theme === 'green'
-            ? 'radial-gradient(ellipse at 80% 20%, rgba(16, 185, 129, 0.2), transparent 60%), linear-gradient(135deg, #064e3b 0%, #047857 50%, #065f46 100%)'
-            : 'radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.25), transparent 60%), linear-gradient(135deg, #0f2744 0%, #006699 60%, #0088cc 100%)',
-          borderColor: theme === 'black-gold' ? '#d4af37' : 'rgba(255, 255, 255, 0.15)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(5, 150, 105, 0.22), transparent 70%), radial-gradient(ellipse at 85% 90%, rgba(212, 175, 55, 0.12), transparent 60%), linear-gradient(145deg, #022017 0%, #032b1f 40%, #071913 100%)',
           color: '#ffffff',
         }}
       >
-        {/* Subtle decorative glow */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-blue-400/10 blur-3xl pointer-events-none" />
+        {/* Subtle Decorative Ambient Glows */}
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[650px] h-[350px] rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 -left-28 w-80 h-80 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
+        {/* Subtle Islamic Geometric / Grid Lattice Pattern Overlay */}
+        <div 
+          className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:24px_24px]" 
+        />
+
+        <div className="relative z-10 max-w-6xl mx-auto space-y-10 sm:space-y-12">
           
-          {/* Hero Left Content */}
-          <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-center lg:text-left">
+          {/* Top Brand Showcase: Centered Green Emblem + Sacred Arabic Verse */}
+          <div className="flex flex-col items-center text-center space-y-5">
             
-            {/* Top Pill with DB status */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs sm:text-sm font-semibold text-amber-300 shadow-sm">
-              <Database className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>
-                {dbStatus === 'connected' ? `Neon PostgreSQL Connected (${dbLatency}ms)` : 'Cloud Accounting Engine'}
+            {/* Illuminated Green Emblem Logo */}
+            <div className="relative group">
+              <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-amber-400 rounded-full blur-md opacity-40 group-hover:opacity-75 transition duration-500" />
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full p-1.5 bg-gradient-to-b from-amber-300/40 via-emerald-600/30 to-emerald-950/80 border-2 border-amber-400/50 shadow-2xl flex items-center justify-center backdrop-blur-md">
+                <img 
+                  src="/logo.png" 
+                  alt="Official Institutional Green Emblem" 
+                  className="w-full h-full object-contain rounded-full drop-shadow-xl"
+                />
+              </div>
+            </div>
+
+            {/* Sacred Quranic Calligraphy Motto (Surah Hud 88) */}
+            <div className="inline-flex flex-col items-center px-5 py-2.5 rounded-2xl bg-white/5 border border-emerald-400/20 backdrop-blur-md shadow-lg max-w-2xl">
+              <span className="font-arabic text-base sm:text-xl lg:text-2xl text-amber-300 font-bold leading-relaxed tracking-wide dir-rtl">
+                إِنْ أُرِيدُ إِلَّا الْإِصْلَاحَ مَا اسْتَطَعْتُ ۚ وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ
+              </span>
+              <span className="text-[11px] sm:text-xs text-emerald-200/80 font-medium tracking-wider mt-1">
+                "I only intend reform to the best of my ability; and my success is only by Allah" (Surah Hud 88)
               </span>
             </div>
 
-            {/* Main Headline */}
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight">
-              Institutional Accounting & <span className="text-amber-300">Financial Record Keeping</span>
-            </h1>
+            {/* Main Institutional Headline */}
+            <div className="space-y-3 max-w-4xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-300 text-xs font-semibold tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Enterprise Accounting & Google Sheets System</span>
+              </div>
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15]">
+                {orgConfig.nameEnglish || 'Financial Record Keeper'}
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-300 text-2xl sm:text-4xl lg:text-5xl font-black mt-2">
+                  Institutional Accounting & Cloud Ledger
+                </span>
+              </h1>
+              <p className="text-sm sm:text-base lg:text-lg text-slate-300 font-normal leading-relaxed max-w-3xl mx-auto pt-2">
+                A dedicated, Shariah-compliant financial management portal tailored for madaris, Islamic foundations, and charitable trusts. Unifying double-entry cashbooks, Google Sheets clone spreadsheets, real-date receipt voucher issuance, and persistent Neon PostgreSQL cloud storage.
+              </p>
+            </div>
 
-            {/* Description */}
-            <p className="text-sm sm:text-base lg:text-lg text-slate-200 font-normal leading-relaxed max-w-2xl">
-              Professional double-entry ledger portal and spreadsheet management tailored for religious institutions, madaris, and welfare trusts. Setup monthly or weekly cashbooks, segregate Shariah funds (Zakat vs General), and issue official print-ready vouchers.
-            </p>
-
-            {/* Primary Action Button: ONLY Open Dashboard */}
-            <div className="pt-2">
+            {/* PRIMARY HERO CALL TO ACTION: ONLY OPEN DASHBOARD */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-black text-base sm:text-lg text-slate-900 shadow-2xl transition-all hover:scale-105 active:scale-95 bg-linear-to-r from-amber-300 via-amber-400 to-amber-500 hover:from-amber-200 hover:to-amber-400 border border-amber-200/80 cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-8 py-4 sm:px-10 sm:py-4.5 rounded-2xl font-black text-base sm:text-lg text-slate-950 shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 hover:from-amber-200 hover:to-amber-400 border border-amber-200/90 cursor-pointer shadow-amber-500/20"
               >
-                <LayoutDashboard className="w-6 h-6 text-slate-900 shrink-0" />
+                <LayoutDashboard className="w-6 h-6 text-slate-950 shrink-0" />
                 <span>Open Dashboard</span>
-                <ArrowRight className="w-5 h-5 text-slate-900 shrink-0" />
+                <ArrowRight className="w-5 h-5 text-slate-950 shrink-0 stroke-[2.5]" />
               </button>
-            </div>
 
-            {/* Highlights checklist */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-4 border-t border-white/10 text-xs sm:text-sm text-slate-200">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span>Neon PostgreSQL Cloud DB</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span>Zero Demo / Clean Slate</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span>Shariah Fund Segregation</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Hero Right: Live Interactive Voucher Preview Snapshot */}
-          <div className="lg:col-span-5 flex justify-center">
-            <div className="relative w-full max-w-[480px] bg-slate-900/40 p-3 rounded-2xl border border-white/20 backdrop-blur-md shadow-2xl group hover:scale-[1.02] transition-transform duration-300">
-              <div className="flex items-center justify-between px-3 py-1.5 mb-2 bg-black/30 rounded-lg text-xs font-semibold text-amber-300">
-                <span className="flex items-center gap-1.5">
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>{isUrdu ? 'آفیشل رسید کا نمونہ' : 'Official Jamia Voucher'}</span>
-                </span>
-                <button 
-                  onClick={() => setActiveTab('receipt')}
-                  className="text-white hover:underline flex items-center gap-1 text-[11px]"
-                >
-                  <span>{isUrdu ? 'کھولیں' : 'Open Studio'}</span> <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* Scaled preview of voucher */}
-              <div className="overflow-x-auto rounded-lg shadow-inner bg-white max-h-[380px] p-1 sm:p-2">
-                {activeReceiptTransaction ? (
-                  <PrintableVoucher 
-                    transaction={activeReceiptTransaction}
-                    orgConfig={orgConfig}
-                    categories={categories}
-                    theme={theme}
-                    isCompact={true}
-                  />
-                ) : (
-                  <div className="p-8 text-center text-slate-500">
-                    <Receipt className="w-10 h-10 text-blue-500 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs font-semibold text-slate-700">Digital Voucher Template Active</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Ready for real receipt issuance. Spells Urdu and English numbers automatically.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-
-      {/* LIVE ACCOUNTING KPI STATS CARDS */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        
-        {/* Total Collections */}
-        <div className="bg-white dark:bg-slate-800/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Collections (Inflows)
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              💰
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-            {orgConfig.currencySymbol} {totalIncome.toLocaleString()}
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            {transactions.filter(t => t.type === 'income').length} verified ledger entries
-          </p>
-        </div>
-
-        {/* Total Expenditures */}
-        <div className="bg-white dark:bg-slate-800/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Expenditures (Outflows)
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
-              📉
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400 font-mono">
-            {orgConfig.currencySymbol} {totalExpense.toLocaleString()}
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            Salaries, utilities, operational costs
-          </p>
-        </div>
-
-        {/* Net Available Balance */}
-        <div className="bg-white dark:bg-slate-800/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Net Available Balance
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
-              🏛️
-            </div>
-          </div>
-          <div className={`text-2xl sm:text-3xl font-black font-mono ${netBalance >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600'}`}>
-            {orgConfig.currencySymbol} {netBalance.toLocaleString()}
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            Current liquid bank & cash balance
-          </p>
-        </div>
-
-        {/* Active Sheet Ledgers */}
-        <div className="bg-white dark:bg-slate-800/80 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Active Ledger Sheets
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-              📑
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 font-mono">
-            {sheetTabs.length}
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            Configured spreadsheet sheets
-          </p>
-        </div>
-
-      </section>
-
-      {/* HOW ACCOUNTING & RECORD KEEPING WORKS: 4-STEP CADENCE */}
-      <section className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 sm:p-8 md:p-10 border border-slate-200 dark:border-slate-700 shadow-sm space-y-8">
-        
-        <div className="text-center max-w-3xl mx-auto space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider border border-blue-200 dark:border-blue-800">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Workflow & Guide</span>
-          </div>
-          <h2 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            How Financial Record Keeping Works
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Choose whether to track your finances by Month, by Week, or in a completely free-form Raw Sheet.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Step 1 */}
-          <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center text-sm shadow-md">
-              1
-            </div>
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Choose Record Cadence
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Click <strong>Create Periodic Ledger</strong> to select a specific <strong>Month</strong> (e.g. October 2026) or <strong>Week</strong>, or click <strong>Raw Blank Sheet</strong> if you prefer unconstrained custom columns.
-            </p>
-            <div className="pt-2">
-              <button 
-                onClick={() => setIsPeriodicModalOpen(true)}
-                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-              >
-                <span>Select Period</span> <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-md">
-              2
-            </div>
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Enter Incomes & Expenditures
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Enter donor contributions, membership dues, or institutional expenses in the Google Sheets grid. Double-click any cell to edit inline or type into the formula bar.
-            </p>
-            <div className="pt-2">
-              <button 
+              <button
                 onClick={() => setActiveTab('sheets')}
-                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-bold text-sm sm:text-base text-white bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
               >
-                <span>Open Spreadsheet Grid</span> <ArrowRight className="w-3 h-3" />
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>Go to Spreadsheets</span>
               </button>
             </div>
+
           </div>
 
-          {/* Step 3 */}
-          <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-600 text-white font-bold flex items-center justify-center text-sm shadow-md">
-              3
+          {/* IN-DEPTH SYSTEM CAPABILITIES: 4 ARCHITECTURAL PILLARS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 pt-4">
+            
+            {/* Pillar 1: Google Sheets Clone Grid */}
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-emerald-400/40 transition-all duration-300 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-bold shadow-xs">
+                <FileSpreadsheet className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-white text-base">
+                Google Sheets Clone
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Full-featured spreadsheet grid with 100s of rows, formula bar, keyboard navigation (Enter/Tab), sticky row numbers, and 1-click Excel (.xlsx) / PDF exports.
+              </p>
             </div>
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Issue Official Printed Vouchers
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Click the receipt icon on any row to open the authentic voucher with Urdu and English amount-to-words, institutional seal, and 1-click PDF / PNG download.
-            </p>
-            <div className="pt-2">
-              <button 
-                onClick={() => setActiveTab('receipt')}
-                className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
-              >
-                <span>Go to Voucher Studio</span> <ArrowRight className="w-3 h-3" />
-              </button>
+
+            {/* Pillar 2: Shariah Fund Segregation */}
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-amber-400/40 transition-all duration-300 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-600/30 border border-amber-400/30 text-amber-300 flex items-center justify-center font-bold shadow-xs">
+                <Scale className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-white text-base">
+                Shariah Fund Segregation
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Strict separation between restricted Zakat & Fitrana welfare funds versus unrestricted General Sadaqat, Khairat, Qurbani, and Madrassah construction dues.
+              </p>
+            </div>
+
+            {/* Pillar 3: Neon PostgreSQL Cloud Database */}
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-emerald-400/40 transition-all duration-300 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 text-blue-300 flex items-center justify-center font-bold shadow-xs">
+                <Database className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-white text-base">
+                Neon Cloud Database
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Zero mock records. Every ledger row and spreadsheet update is securely synchronized in real time to your cloud PostgreSQL database with SSL encryption.
+              </p>
+            </div>
+
+            {/* Pillar 4: Digital Receipt Studio */}
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-indigo-400/40 transition-all duration-300 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-400/30 text-indigo-300 flex items-center justify-center font-bold shadow-xs">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-white text-base">
+                Official Voucher Studio
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Real-date receipt numbering (REC-YYYYMMDD-NNN) with automatic Urdu and English number-to-words spelling and instant printable institutional vouchers.
+              </p>
+            </div>
+
+          </div>
+
+          {/* REAL-TIME SYSTEM TELEMETRY STRIP */}
+          <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300 font-medium">
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className="font-semibold text-white">
+                {dbStatus === 'connected' 
+                  ? `Neon PostgreSQL Online (${dbLatency}ms latency)` 
+                  : 'Cloud Database Active'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{sheetTabs.length} Configured Sheets</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>{categories.length} Shariah Funds</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                <span>{transactions.length} Verified Records</span>
+              </div>
             </div>
           </div>
 
         </div>
-
       </section>
-
-      {/* CORE ACCOUNTING PILLARS */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Shariah Fund Accounting */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-linear-to-br from-emerald-50 via-white to-emerald-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 shadow-sm space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
-            <Scale className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-            Shariah-Compliant Fund Segregation
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Strict accounting barrier between <strong>Zakat & Fitrana (Restricted Welfare Pool)</strong> and <strong>General Sadaqat / Construction / Operational Funds (Unrestricted)</strong>. Ensures zero mixing of funds and strict Shariah audit compliance.
-          </p>
-          <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Dedicated Zakat & Fitrana Ledger Tabs</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Independent balance tracking for each fund category</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Tamleek compliance for eligible beneficiaries</span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Audit Trail & Cloud Security */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-linear-to-br from-blue-50 via-white to-blue-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-blue-950/20 border border-blue-200 dark:border-blue-800/60 shadow-sm space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-            Audit-Ready Ledger & Cloud Persistence
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Directly connected to a high-performance <strong>Neon PostgreSQL</strong> database. Zero reliance on ephemeral local browser caches. Every record has unique serial numbers, verification flags, and audit timestamps.
-          </p>
-          <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Sequential receipt numbering & anti-tamper tracking</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>1-click JSON backup and Excel (.xlsx) exports</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Instant cloud synchronization across multiple operators</span>
-            </li>
-          </ul>
-        </div>
-
-      </section>
-
-      {/* QUICK LAUNCH CALL TO ACTION */}
-      <section className="rounded-3xl p-8 sm:p-12 text-center bg-slate-900 text-white border border-slate-800 shadow-xl space-y-6">
-        <h2 className="text-2xl sm:text-3xl font-black">
-          Ready to start recording your financial transactions?
-        </h2>
-        <p className="text-sm text-slate-400 max-w-xl mx-auto">
-          Start with a clean raw spreadsheet or choose your specific month/week to begin data entry. All entries are instantly saved to your Neon database.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            onClick={() => setIsPeriodicModalOpen(true)}
-            className="px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg flex items-center gap-2 transition-all"
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Setup Monthly / Weekly Ledger</span>
-          </button>
-          <button
-            onClick={handleOpenRawSheet}
-            className="px-6 py-3.5 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 font-bold text-sm shadow-lg flex items-center gap-2 transition-all"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Open Raw Blank Sheet</span>
-          </button>
-        </div>
-      </section>
-
     </div>
   );
 };
+

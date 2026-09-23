@@ -29,8 +29,12 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-3 cursor-pointer group select-none"
             onClick={() => setActiveTab('landing')}
           >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-md bg-emerald-600 text-white font-black group-hover:scale-105 transition-transform flex-shrink-0">
-              📊
+            <div className="w-11 h-11 rounded-full flex items-center justify-center p-0.5 bg-emerald-600/20 border border-emerald-500/40 shadow-md group-hover:scale-105 transition-transform flex-shrink-0">
+              <img 
+                src="/logo.png" 
+                alt="Green Emblem Logo" 
+                className="w-full h-full object-contain rounded-full drop-shadow-sm" 
+              />
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
