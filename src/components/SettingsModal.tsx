@@ -420,7 +420,7 @@ export const SettingsModal: React.FC = () => {
                   />
                   <input
                     type="text"
-                    placeholder="Account Title (e.g. Al-Jamia Al-Ghafaria)"
+                    placeholder="Account Title (e.g. Markaz Rooh ul Islam)"
                     value={newAccountTitle}
                     onChange={(e) => setNewAccountTitle(e.target.value)}
                     className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"

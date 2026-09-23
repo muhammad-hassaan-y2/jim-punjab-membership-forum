@@ -100,7 +100,7 @@ export const PrintableVoucher: React.FC<PrintableVoucherProps> = ({
               fontFamily: 'Outfit, sans-serif'
             }}
           >
-            {orgConfig.nameEnglish || 'AL-JAMIA AL-ARBAIA AL-GHAFARIA'}
+            {orgConfig.nameEnglish || 'Markaz Rooh ul Islam'}
           </h1>
 
           {/* Arabic Large Title */}
@@ -112,7 +112,7 @@ export const PrintableVoucher: React.FC<PrintableVoucherProps> = ({
             }}
             dir="rtl"
           >
-            {orgConfig.nameUrdu || 'الجامعة العربية الغفارية'}
+            {orgConfig.nameUrdu || 'مرکز روح الاسلام'}
           </h2>
 
           {/* Subheader Banner (Pill) */}
