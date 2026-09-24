@@ -19,16 +19,20 @@ export function exportTransactionsToExcel(
       'Sr #': index + 1,
       'Receipt No / رسید نمبر': t.receiptNo,
       'Date / تاریخ': t.date,
-      'Donor / Payee Name (اسم گرامی)': t.donorNameUrdu || t.donorName,
-      'English Name': t.donorName,
-      'Amount / رقم': t.amount,
+      'Received From (اسم گرامی)': t.donorNameUrdu || t.donorName,
+      'Address / پتہ': t.address || '',
+      'City / شہر': t.city || '',
+      'Preferred Period / مدت': t.preferredPeriod || '',
+      'Monthly / ماہانہ': t.monthlyAmount || '',
+      'Quarterly / سہ ماہی': t.quarterlyAmount || '',
+      'Half Yearly / شش ماہی': t.halfYearlyAmount || '',
+      'Annually / سالانہ': t.annuallyAmount || '',
+      'Total Amount as Period / کل رقم': t.amount,
       'Type / نوعیت': t.type === 'income' ? 'آمدن (Income)' : 'اخراجات (Expense)',
       'Category / شعبہ فنڈ': cat ? `${cat.ur} (${cat.en})` : t.categoryId,
       'Payment Mode / طریقہ': t.paymentMode,
       'Bank Name / بینک': t.bankName || 'N/A',
-      'Cheque/Txn #': t.chequeOrTxnNo || 'N/A',
-      'Address / پتہ': t.address || 'N/A',
-      'Reference / بتوسط': t.reference || 'N/A',
+      'Mobile # / موبائل': t.phone || '',
       'Status / کیفیت': t.status,
       'Notes / تفصیل': t.notes || '',
     };
@@ -254,22 +258,26 @@ export function printSheetAsPDF(
   }
 
   const tableRowsHtml = transactions.length === 0
-    ? `<tr><td colspan="11" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
+    ? `<tr><td colspan="15" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
     : transactions.map((t, index) => {
         const catName = categoryMap.get(t.categoryId) || t.categoryId;
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 6px 8px; font-family: monospace; text-align: center; color: #64748b;">${index + 1}</td>
-            <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: #2563eb;">${t.receiptNo || '---'}</td>
-            <td style="padding: 6px 8px; font-family: monospace; text-align: center;">${t.date || '---'}</td>
-            <td style="padding: 6px 8px; font-weight: 600;">${t.donorName || t.donorNameUrdu || '---'}</td>
-            <td style="padding: 6px 8px; color: #475569; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.address || '---'}</td>
-            <td style="padding: 6px 8px; color: #475569;">${t.reference || '---'}</td>
-            <td style="padding: 6px 8px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">${Number(t.amount || 0).toLocaleString()}</td>
-            <td style="padding: 6px 8px; text-align: center;">${t.paymentMode || 'Cash'}</td>
-            <td style="padding: 6px 8px; color: #475569;">${t.bankName || '---'}</td>
-            <td style="padding: 6px 8px; font-family: monospace;">${t.phone || '---'}</td>
-            <td style="padding: 6px 8px; font-weight: 600; color: #0284c7;">${catName}</td>
+            <td style="padding: 5px 6px; font-family: monospace; text-align: center; color: #64748b;">${index + 1}</td>
+            <td style="padding: 5px 6px; font-family: monospace; font-weight: bold; color: #2563eb;">${t.receiptNo || '---'}</td>
+            <td style="padding: 5px 6px; font-family: monospace; text-align: center;">${t.date || '---'}</td>
+            <td style="padding: 5px 6px; font-weight: 600;">${t.donorName || t.donorNameUrdu || '---'}</td>
+            <td style="padding: 5px 6px; color: #475569; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.address || '---'}</td>
+            <td style="padding: 5px 6px; color: #475569;">${t.city || '---'}</td>
+            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.monthlyAmount ? Number(t.monthlyAmount).toLocaleString() : (t.preferredPeriod === 'Monthly' ? '✓' : '-')}</td>
+            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? Number(t.quarterlyAmount).toLocaleString() : (t.preferredPeriod === 'Quarterly' ? '✓' : '-')}</td>
+            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.halfYearlyAmount ? Number(t.halfYearlyAmount).toLocaleString() : (t.preferredPeriod === 'Half Yearly' ? '✓' : '-')}</td>
+            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.annuallyAmount ? Number(t.annuallyAmount).toLocaleString() : (t.preferredPeriod === 'Annually' ? '✓' : '-')}</td>
+            <td style="padding: 5px 6px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">${Number(t.amount || 0).toLocaleString()}</td>
+            <td style="padding: 5px 6px; text-align: center;">${t.paymentMode || 'Cash'}</td>
+            <td style="padding: 5px 6px; color: #475569;">${t.bankName || '---'}</td>
+            <td style="padding: 5px 6px; font-family: monospace;">${t.phone || '---'}</td>
+            <td style="padding: 5px 6px; font-weight: 600; color: #0284c7;">${catName}</td>
           </tr>
         `;
       }).join('');
@@ -419,12 +427,16 @@ export function printSheetAsPDF(
           <thead>
             <tr>
               <th style="width: 28px; text-align: center;">#</th>
-              <th style="width: 110px;">Receipt No</th>
-              <th style="width: 75px; text-align: center;">Date</th>
+              <th style="width: 90px;">Receipt No</th>
+              <th style="width: 70px; text-align: center;">Date</th>
               <th>Received From</th>
               <th>Address</th>
-              <th>Reference</th>
-              <th style="text-align: right;">Money (${orgConfig.currencySymbol})</th>
+              <th>City</th>
+              <th style="text-align: right;">Monthly</th>
+              <th style="text-align: right;">Quarterly</th>
+              <th style="text-align: right;">Half Yearly</th>
+              <th style="text-align: right;">Annually</th>
+              <th style="text-align: right;">Total Amount (${orgConfig.currencySymbol})</th>
               <th style="text-align: center;">Payment</th>
               <th>Bank Name</th>
               <th>Mobile #</th>

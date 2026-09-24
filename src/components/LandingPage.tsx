@@ -2,229 +2,273 @@
 
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
-import { 
-  FileSpreadsheet, 
-  Receipt, 
-  Database, 
-  ShieldCheck, 
-  Scale, 
-  ArrowRight, 
-  CheckCircle2, 
-  LayoutDashboard,
-  Layers,
-  Coins,
-  Sparkles,
-  BookOpen
-} from 'lucide-react';
+import { ArrowRight, ShieldCheck, Database, FileSpreadsheet, Sparkles } from 'lucide-react';
+
+/* ==========================================================================
+   SACRED QURANIC AYAT BANNER (EMERALD & GOLD LUXURY COMPONENT)
+   ========================================================================== */
+export const AyatBanner: React.FC = () => {
+  return (
+    <div className="relative w-full max-w-xl mx-auto rounded-3xl border border-amber-400/70 shadow-[0_15px_35px_rgba(6,78,59,0.3),inset_0_0_30px_rgba(16,185,129,0.15)] overflow-hidden transition-all duration-300 hover:scale-[1.01] bg-gradient-to-br from-emerald-950 via-[#032e23] to-[#011c15] p-5 sm:p-6 text-white group">
+      
+      {/* Intricate Islamic Geometric Background Pattern */}
+      <div 
+        className="absolute inset-0 opacity-15 pointer-events-none transition-opacity group-hover:opacity-25"
+        style={{
+          backgroundImage: `radial-gradient(circle at center, #f59e0b 1px, transparent 1px),
+                            radial-gradient(circle at 0% 0%, #10b981 1.5px, transparent 1.5px)`,
+          backgroundSize: '24px 24px'
+        }}
+      />
+
+      {/* Decorative Golden Corner Filigree (SVG) */}
+      <div className="absolute top-2 left-2 w-7 h-7 sm:w-8 sm:h-8 text-amber-400 opacity-90 pointer-events-none">
+        <svg viewBox="0 0 40 40" fill="none" className="w-full h-full">
+          <path d="M2 38 V12 C2 6 6 2 12 2 H38" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+          <path d="M2 18 C8 18 14 12 14 6" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </div>
+      <div className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 text-amber-400 opacity-90 pointer-events-none scale-x-[-1]">
+        <svg viewBox="0 0 40 40" fill="none" className="w-full h-full">
+          <path d="M2 38 V12 C2 6 6 2 12 2 H38" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+          <path d="M2 18 C8 18 14 12 14 6" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </div>
+      <div className="absolute bottom-2 left-2 w-7 h-7 sm:w-8 sm:h-8 text-amber-400 opacity-90 pointer-events-none scale-y-[-1]">
+        <svg viewBox="0 0 40 40" fill="none" className="w-full h-full">
+          <path d="M2 38 V12 C2 6 6 2 12 2 H38" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+          <path d="M2 18 C8 18 14 12 14 6" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </div>
+      <div className="absolute bottom-2 right-2 w-7 h-7 sm:w-8 sm:h-8 text-amber-400 opacity-90 pointer-events-none scale-[-1]">
+        <svg viewBox="0 0 40 40" fill="none" className="w-full h-full">
+          <path d="M2 38 V12 C2 6 6 2 12 2 H38" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+          <path d="M2 18 C8 18 14 12 14 6" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center text-center space-y-2 px-2 sm:px-4">
+        
+        {/* 1. Bismillah Calligraphy */}
+        <div className="font-arabic text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-300 to-amber-100 tracking-wider select-none dir-rtl drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+          بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+        </div>
+
+        {/* Delicate Golden Divider */}
+        <div className="flex items-center justify-center gap-3 w-full my-0.5 opacity-90">
+          <span className="h-[1px] w-12 sm:w-24 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+          <span className="text-xs text-amber-300">✦</span>
+          <span className="h-[1px] w-12 sm:w-24 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+        </div>
+
+        {/* 2. Sacred Quranic Verse: Surah Hud 88 */}
+        <div className="font-arabic text-lg sm:text-2xl md:text-3xl font-bold text-emerald-50 leading-relaxed select-none dir-rtl drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+          إِنْ أُرِيدُ إِلَّا الْإِصْلَاحَ مَا اسْتَطَعْتُ ۚ وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ
+        </div>
+
+        {/* 3. English Meaning & Reference */}
+        <div className="text-[11px] sm:text-xs text-amber-200/80 font-medium italic tracking-wide pt-1 border-t border-emerald-800/40 w-full">
+          "I only intend reform to the best of my ability; and my success is only by Allah" (Surah Hud 88)
+        </div>
+
+      </div>
+    </div>
+  );
+};
 
 export const LandingPage: React.FC = () => {
-  const { 
-    setActiveTab, 
-    orgConfig, 
-    categories, 
-    transactions, 
-    sheetTabs,
-    dbStatus,
-    dbLatency
-  } = useFinance();
+  const { setActiveTab } = useFinance();
 
   return (
-    <div className="pb-8">
-      {/* EXCLUSIVE IN-DEPTH HERO SECTION */}
-      <section 
-        className="relative overflow-hidden rounded-3xl sm:rounded-4xl border border-emerald-500/20 shadow-2xl p-6 sm:p-10 md:p-14 lg:p-16 transition-all duration-300"
+    <div className="relative py-4 sm:py-8 md:py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full transition-colors duration-200">
+      
+      {/* 
+        ========================================================================
+        IMMERSIVE ISLAMIC ARABESQUE GOLDEN-CREAM BACKGROUND
+        ========================================================================
+      */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-[0.065] -z-10"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(5, 150, 105, 0.22), transparent 70%), radial-gradient(ellipse at 85% 90%, rgba(212, 175, 55, 0.12), transparent 60%), linear-gradient(145deg, #022017 0%, #032b1f 40%, #071913 100%)',
-          color: '#ffffff',
+          backgroundImage: `
+            radial-gradient(circle at center, #b48325 2px, transparent 2px),
+            linear-gradient(45deg, transparent 46%, #b48325 48%, #b48325 52%, transparent 54%),
+            linear-gradient(-45deg, transparent 46%, #b48325 48%, #b48325 52%, transparent 54%)
+          `,
+          backgroundSize: '44px 44px'
         }}
-      >
-        {/* Subtle Decorative Ambient Glows */}
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-emerald-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-amber-500/15 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/3 -left-28 w-80 h-80 rounded-full bg-emerald-400/15 blur-3xl pointer-events-none" />
+      />
 
-        {/* Intricate Islamic Geometric Girih Backdrop (SVG) */}
-        <svg className="absolute inset-0 w-full h-full opacity-[0.07] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="islamic-girih-pattern" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
-              <path d="M40 0 L80 40 L40 80 L0 40 Z" fill="none" stroke="#d4af37" strokeWidth="1" />
-              <path d="M0 0 L80 80 M80 0 L0 80" fill="none" stroke="#10b981" strokeWidth="0.75" />
-              <circle cx="40" cy="40" r="16" fill="none" stroke="#f59e0b" strokeWidth="0.75" />
-              <circle cx="0" cy="0" r="16" fill="none" stroke="#10b981" strokeWidth="0.5" />
-              <circle cx="80" cy="0" r="16" fill="none" stroke="#10b981" strokeWidth="0.5" />
-              <circle cx="0" cy="80" r="16" fill="none" stroke="#10b981" strokeWidth="0.5" />
-              <circle cx="80" cy="80" r="16" fill="none" stroke="#10b981" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#islamic-girih-pattern)" />
+      {/* Warm Golden Cream Radial Glow Highlights */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-gradient-to-r from-amber-200/30 via-yellow-100/40 to-amber-200/30 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-12 right-10 w-96 h-96 bg-emerald-700/5 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* Traditional Ornate Islamic Arch Vectors (Gold Accent) */}
+      <div className="absolute top-0 left-0 w-32 h-32 pointer-events-none opacity-20 hidden md:block">
+        <svg viewBox="0 0 120 120" fill="none" className="w-full h-full text-amber-700">
+          <path d="M0 0 H120 V20 C60 20 20 60 20 120 H0 Z" fill="currentColor" opacity="0.15" />
+          <path d="M10 10 H110 V20 C55 20 20 55 20 110 H10 Z" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="35" cy="35" r="4" fill="currentColor" />
         </svg>
+      </div>
+      <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 hidden md:block scale-x-[-1]">
+        <svg viewBox="0 0 120 120" fill="none" className="w-full h-full text-amber-700">
+          <path d="M0 0 H120 V20 C60 20 20 60 20 120 H0 Z" fill="currentColor" opacity="0.15" />
+          <path d="M10 10 H110 V20 C55 20 20 55 20 110 H10 Z" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="35" cy="35" r="4" fill="currentColor" />
+        </svg>
+      </div>
 
-        <div className="relative z-10 max-w-6xl mx-auto space-y-10 sm:space-y-12">
+      {/* 
+        ========================================================================
+        HERO SECTION: REFINED LUXURY COMPOSITION
+        ========================================================================
+      */}
+      <section className="relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           
-          {/* Top Brand Showcase: Bismillah + Centered Green Emblem + Sacred Arabic Verse */}
-          <div className="flex flex-col items-center text-center space-y-4">
+          {/* LEFT COLUMN: Ayat Component, Brand Identity, Text, CTA */}
+          <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left space-y-6 order-1">
             
-            {/* Bismillah Calligraphy */}
-            <div className="font-arabic text-lg sm:text-2xl text-amber-300/80 select-none tracking-widest">
-              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-            </div>
+            {/* 1. Green & Gold Ayat Banner */}
+            <AyatBanner />
 
-            {/* Illuminated Green Emblem Logo with Transparent Background */}
-            <div className="relative group my-2">
-              <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500/30 via-amber-400/30 to-emerald-600/30 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition duration-700" />
-              <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full p-2 bg-gradient-to-b from-emerald-900/60 via-slate-900/80 to-black/90 border-2 border-amber-400/40 shadow-2xl flex items-center justify-center backdrop-blur-md">
-                <img 
-                  src="/logo.png" 
-                  alt="Markaz Rooh ul Islam Official Emblem" 
-                  className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
-                />
+            {/* 2. Brand Identity: CENTERED ARABIC + CRISP ENGLISH */}
+            <div className="space-y-2 pt-1 w-full text-center">
+              
+              {/* Centered Arabic Title */}
+              <div className="relative inline-block mx-auto">
+                <h1 className="font-arabic text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-emerald-950 dark:text-emerald-300 leading-tight tracking-normal">
+                  مرکز روح الاسلام
+                </h1>
+                <div className="h-1 w-24 sm:w-32 mx-auto mt-2 rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
               </div>
-            </div>
-
-            {/* Sacred Quranic Calligraphy Motto (Surah Hud 88) */}
-            <div className="inline-flex flex-col items-center px-6 py-2.5 rounded-2xl bg-white/5 border border-emerald-400/20 backdrop-blur-md shadow-lg max-w-2xl">
-              <span className="font-arabic text-lg sm:text-2xl lg:text-3xl text-amber-300 font-bold leading-relaxed tracking-wide dir-rtl">
-                إِنْ أُرِيدُ إِلَّا الْإِصْلَاحَ مَا اسْتَطَعْتُ ۚ وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ
-              </span>
-              <span className="text-[11px] sm:text-xs text-emerald-200/80 font-medium tracking-wider mt-1">
-                "I only intend reform to the best of my ability; and my success is only by Allah" (Surah Hud 88)
-              </span>
-            </div>
-
-            {/* Main Institutional Identity: Simple Markaz Rooh ul Islam in Arabic & English */}
-            <div className="space-y-3 max-w-4xl pt-2">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-emerald-300 text-xs font-semibold tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>مرکز روح الاسلام • ادارتی نظامِ حسابات و مالی ریکارڈ کیپر</span>
-              </div>
-
-              {/* Arabic Name */}
-              <h2 className="font-arabic text-3xl sm:text-5xl lg:text-6xl font-bold text-amber-300 drop-shadow-md leading-tight pt-1">
-                مرکز روح الاسلام
-              </h2>
 
               {/* English Name */}
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-wide uppercase">
-                Markaz Rooh ul Islam
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-amber-200 to-amber-400 text-lg sm:text-2xl lg:text-3xl font-bold mt-1 normal-case tracking-normal">
-                  Institutional Financial Accounting & Cloud Spreadsheet Portal
-                </span>
-              </h1>
-
-              <p className="text-sm sm:text-base lg:text-lg text-slate-300 font-normal leading-relaxed max-w-3xl mx-auto pt-2">
-                Dedicated Shariah-compliant financial accounting system for <strong>Markaz Rooh ul Islam</strong>. Featuring unified cashbooks, Google Sheets clone spreadsheets, real-date voucher issuance, and persistent Neon PostgreSQL cloud storage.
-              </p>
+              <h2 className="text-xs sm:text-sm md:text-base font-extrabold tracking-[0.2em] text-emerald-700 dark:text-emerald-400 uppercase pt-1">
+                MARKAZ ROOH UL ISLAM
+              </h2>
             </div>
 
-            {/* PRIMARY HERO CALL TO ACTION: ONLY OPEN DASHBOARD */}
-            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-8 py-4 sm:px-10 sm:py-4.5 rounded-2xl font-black text-base sm:text-lg text-slate-950 shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 hover:from-amber-200 hover:to-amber-400 border border-amber-200/90 cursor-pointer shadow-amber-500/20"
-              >
-                <LayoutDashboard className="w-6 h-6 text-slate-950 shrink-0" />
-                <span>Open Dashboard</span>
-                <ArrowRight className="w-5 h-5 text-slate-950 shrink-0 stroke-[2.5]" />
-              </button>
+            {/* 3. Subheading */}
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug w-full text-center lg:text-left">
+              Complete Fund and Accounts Management.
+            </h3>
 
-              <button
-                onClick={() => setActiveTab('sheets')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-bold text-sm sm:text-base text-white bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span>Open Spreadsheets</span>
-              </button>
-            </div>
+            {/* 4. Description Paragraph */}
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed max-w-xl w-full text-center lg:text-left">
+              Centralized and transparent accounting for Markaz Rooh ul Islam. Manage funds, calculate donations, and track records efficiently, under the spiritual guidance of Hazrat Tahir Mehboob Sajjan Saeen.
+            </p>
 
-          </div>
-
-          {/* IN-DEPTH SYSTEM CAPABILITIES: 4 ARCHITECTURAL PILLARS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 pt-4">
-            
-            {/* Pillar 1: Google Sheets Clone Grid */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-emerald-400/40 transition-all duration-300 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-bold shadow-xs">
-                <FileSpreadsheet className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-white text-base">
-                Google Sheets Clone
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Full-featured spreadsheet grid with 100s of rows, formula bar, keyboard navigation (Enter/Tab), sticky row numbers, and 1-click Excel (.xlsx) / PDF exports.
-              </p>
-            </div>
-
-            {/* Pillar 2: Shariah Fund Segregation */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-amber-400/40 transition-all duration-300 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-600/30 border border-amber-400/30 text-amber-300 flex items-center justify-center font-bold shadow-xs">
-                <Scale className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-white text-base">
-                Shariah Fund Segregation
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Strict separation between restricted Zakat & Fitrana welfare funds versus unrestricted General Sadaqat, Khairat, Qurbani, and Madrassah construction dues.
-              </p>
-            </div>
-
-            {/* Pillar 3: Neon PostgreSQL Cloud Database */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-emerald-400/40 transition-all duration-300 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 text-blue-300 flex items-center justify-center font-bold shadow-xs">
-                <Database className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-white text-base">
-                Neon Cloud Database
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Zero mock records. Every ledger row and spreadsheet update is securely synchronized in real time to your cloud PostgreSQL database with SSL encryption.
-              </p>
-            </div>
-
-            {/* Pillar 4: Digital Receipt Studio */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-indigo-400/40 transition-all duration-300 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-400/30 text-indigo-300 flex items-center justify-center font-bold shadow-xs">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-white text-base">
-                Official Voucher Studio
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Real-date receipt numbering (REC-YYYYMMDD-NNN) with automatic Urdu and English number-to-words spelling and instant printable institutional vouchers.
-              </p>
-            </div>
-
-          </div>
-
-          {/* REAL-TIME SYSTEM TELEMETRY STRIP */}
-          <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-300 font-medium">
-            <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="font-semibold text-white">
-                {dbStatus === 'connected' 
-                  ? `Neon PostgreSQL Online (${dbLatency}ms latency)` 
-                  : 'Cloud Database Active'}
+            {/* 5. Trust / Shariah Indicators with Golden-Cream Luxury Badges */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1 text-xs text-emerald-950 font-semibold">
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                Shariah-Compliant Funds
+              </span>
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                Instant Voucher Studio
+              </span>
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
+                <Database className="w-4 h-4 text-emerald-700" />
+                Cloud Database Sync
               </span>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{sheetTabs.length} Configured Sheets</span>
+            {/* 6. Call-To-Action Button: ONLY Get Started in better colors */}
+            <div className="pt-2 sm:pt-4 w-full flex justify-center lg:justify-start">
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/dashboard';
+                  } else {
+                    setActiveTab('sheets');
+                  }
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-9 py-4 sm:px-11 sm:py-4.5 rounded-2xl font-black text-base sm:text-lg text-emerald-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-[0_10px_30px_rgba(245,158,11,0.35)] hover:shadow-[0_15px_35px_rgba(245,158,11,0.45)] transition-all duration-300 hover:scale-[1.04] active:scale-95 cursor-pointer border-2 border-amber-200/80 ring-4 ring-amber-400/20"
+                title="Launch Financial Portal & Sheets"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-5 h-5 text-emerald-950 stroke-[3]" />
+              </button>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: Official Photograph of Hazrat Tahir Mehboob Sajjan Saeen in LUXURY GREEN & GOLD FRAME */}
+          <div className="lg:col-span-5 flex justify-center order-2 w-full">
+            <div className="relative group w-full max-w-xs sm:max-w-sm md:max-w-md rounded-3xl overflow-hidden border-2 border-amber-400 shadow-2xl bg-gradient-to-b from-emerald-900 via-emerald-950 to-[#02241b] p-3.5 sm:p-4 transition-all duration-500 hover:shadow-[0_25px_50px_rgba(6,78,59,0.4)]">
+              
+              {/* Subtle Glowing Islamic Background Watermark */}
+              <div 
+                className="absolute inset-0 opacity-10 pointer-events-none"
+                style={{
+                  backgroundImage: `radial-gradient(circle at center, #fbbf24 1.5px, transparent 1.5px)`,
+                  backgroundSize: '18px 18px'
+                }}
+              />
+
+              {/* Ornate Corner Accents for Huzoor Component */}
+              <div className="absolute top-2 left-2 w-6 h-6 text-amber-400 opacity-90 pointer-events-none">
+                <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                  <path d="M2 22 V6 C2 3.8 3.8 2 6 2 H22" stroke="currentColor" strokeWidth="2.5" />
+                  <circle cx="6" cy="6" r="2" fill="currentColor" />
+                </svg>
               </div>
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                <span>{categories.length} Shariah Funds</span>
+              <div className="absolute top-2 right-2 w-6 h-6 text-amber-400 opacity-90 pointer-events-none scale-x-[-1]">
+                <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                  <path d="M2 22 V6 C2 3.8 3.8 2 6 2 H22" stroke="currentColor" strokeWidth="2.5" />
+                  <circle cx="6" cy="6" r="2" fill="currentColor" />
+                </svg>
               </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>{transactions.length} Verified Records</span>
+              <div className="absolute bottom-2 left-2 w-6 h-6 text-amber-400 opacity-90 pointer-events-none scale-y-[-1]">
+                <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                  <path d="M2 22 V6 C2 3.8 3.8 2 6 2 H22" stroke="currentColor" strokeWidth="2.5" />
+                  <circle cx="6" cy="6" r="2" fill="currentColor" />
+                </svg>
               </div>
+              <div className="absolute bottom-2 right-2 w-6 h-6 text-amber-400 opacity-90 pointer-events-none scale-[-1]">
+                <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
+                  <path d="M2 22 V6 C2 3.8 3.8 2 6 2 H22" stroke="currentColor" strokeWidth="2.5" />
+                  <circle cx="6" cy="6" r="2" fill="currentColor" />
+                </svg>
+              </div>
+
+              {/* Photo Frame with Emerald & Golden Border Accent */}
+              <div className="relative overflow-hidden rounded-2xl bg-emerald-950 shadow-inner border border-amber-400/50">
+                <img 
+                  src="/hazrat-sajjan-saeen.png" 
+                  alt="Hazrat Tahir Mehboob Sajjan Saeen" 
+                  className="w-full h-auto max-h-[460px] sm:max-h-[520px] object-cover object-top rounded-2xl block mx-auto transition-transform duration-700 group-hover:scale-[1.03]" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/80 via-transparent to-transparent opacity-40 pointer-events-none" />
+              </div>
+
+              {/* Dignified Caption Plaque: NOTICEABLY BIGGER & ILLUMINATED */}
+              <div className="mt-3.5 px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl bg-emerald-950/95 border border-amber-400/60 text-center shadow-xl backdrop-blur-md">
+                {/* English Name */}
+                <div className="text-base sm:text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-300 to-amber-100 tracking-tight leading-tight drop-shadow-xs">
+                  Hazrat Tahir Mehboob Sajjan Saeen
+                </div>
+                {/* Urdu Honorific & Title */}
+                <div className="font-arabic text-sm sm:text-base md:text-lg text-emerald-100 font-bold dir-rtl mt-1.5 leading-normal drop-shadow-xs">
+                  حفظہ اللہ تعالی و مدظلہ العالی • سرپرستِ اعلیٰ
+                </div>
+              </div>
+
             </div>
           </div>
 
         </div>
       </section>
+
     </div>
   );
 };
 
+export default LandingPage;

@@ -32,8 +32,14 @@ export interface Transaction {
   donorNameUrdu?: string;
   phone: string;
   address: string; // مکمل پتہ
-  reference: string; // بتوسط
-  amount: number; // رقم
+  city?: string; // شہر
+  reference?: string; // بتوسط (legacy/optional)
+  preferredPeriod?: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually';
+  monthlyAmount?: number;
+  quarterlyAmount?: number;
+  halfYearlyAmount?: number;
+  annuallyAmount?: number;
+  amount: number; // کل رقم (Total Amount as Period)
   amountInWordsUrdu?: string;
   amountInWordsEnglish?: string;
   categoryId: string; // category key

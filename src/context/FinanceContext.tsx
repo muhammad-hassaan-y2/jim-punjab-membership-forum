@@ -91,6 +91,7 @@ interface FinanceContextType {
   deleteCategory: (id: string) => void;
   updateOrgConfig: (config: Partial<OrganizationConfig>) => void;
   generateNextReceiptNumber: () => string;
+  rewriteReceiptNumbersAscending: () => Promise<void>;
   resetToDefaultData: () => void;
   importBackupData: (data: any) => boolean;
   donorsSummary: DonorSummary[];
@@ -214,9 +215,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ]);
 
       if (dbTxs.status === 'fulfilled') {
-        setTransactions(dbTxs.value);
-        if (dbTxs.value.length > 0) {
-          setActiveReceiptTransaction(dbTxs.value[0]);
+        const rawTxs = dbTxs.value;
+        const needsAscendingRewrite = rawTxs.length > 0 && rawTxs.some((tx, idx) => tx.receiptNo !== String(idx + 1));
+        if (needsAscendingRewrite) {
+          const sorted = [...rawTxs].sort((a, b) => {
+            const numA = parseInt(String(a.receiptNo || '').replace(/\D/g, ''), 10);
+            const numB = parseInt(String(b.receiptNo || '').replace(/\D/g, ''), 10);
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+          });
+          const rewritten = sorted.map((tx, idx) => ({
+            ...tx,
+            receiptNo: String(idx + 1),
+          }));
+          setTransactions(rewritten);
+          if (rewritten.length > 0) setActiveReceiptTransaction(rewritten[0]);
+          api.bulkSaveTransactions(rewritten, false).catch(console.error);
+        } else {
+          setTransactions(rawTxs);
+          if (rawTxs.length > 0) setActiveReceiptTransaction(rawTxs[0]);
         }
       }
 
@@ -263,14 +280,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLanguageState(newLang);
   };
 
-  const generateNextReceiptNumber = (targetDate?: string): string => {
-    const d = targetDate ? new Date(targetDate) : new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const dateCode = `${yyyy}${mm}${dd}`;
-    const counter = orgConfig.receiptCounter || 1;
-    return `REC-${dateCode}-${String(counter).padStart(3, '0')}`;
+  const generateNextReceiptNumber = (): string => {
+    const nums = transactions.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+    const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
+    return String(maxNum + 1);
+  };
+
+  const rewriteReceiptNumbersAscending = async () => {
+    setDbStatus('syncing');
+    try {
+      setTransactions(prev => {
+        const sorted = [...prev].sort((a, b) => {
+          const numA = parseInt(String(a.receiptNo || '').replace(/\D/g, ''), 10);
+          const numB = parseInt(String(b.receiptNo || '').replace(/\D/g, ''), 10);
+          if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+        const rewritten = sorted.map((tx, idx) => ({
+          ...tx,
+          receiptNo: String(idx + 1),
+        }));
+        api.bulkSaveTransactions(rewritten, false).catch(console.error);
+        return rewritten;
+      });
+      setDbStatus('connected');
+    } catch (err) {
+      console.error('Failed to rewrite receipt numbers:', err);
+      setDbStatus('error');
+    }
   };
 
   // Start with a 100% Raw Blank Spreadsheet (Excel / Google Sheet Grid)
@@ -436,20 +473,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Google Sheets: Add blank row directly with real-date receipt numbering
   const addBlankRow = async (count: number = 1) => {
     setDbStatus('syncing');
     const newRows: Transaction[] = [];
-    const counter = orgConfig.receiptCounter || 1;
+    const nums = transactions.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+    const startNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const dateCode = `${yyyy}${mm}${dd}`;
 
     for (let i = 0; i < count; i++) {
-      const receiptNo = `REC-${dateCode}-${String(counter + i).padStart(3, '0')}`;
+      const receiptNo = String(startNum + i);
       newRows.push({
         id: `tx-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
         receiptNo: receiptNo,
@@ -458,7 +494,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         donorNameUrdu: '',
         phone: '',
         address: '',
+        city: '',
         reference: '',
+        preferredPeriod: 'Monthly',
+        monthlyAmount: 0,
+        quarterlyAmount: 0,
+        halfYearlyAmount: 0,
+        annuallyAmount: 0,
         amount: 0,
         amountInWordsUrdu: '',
         amountInWordsEnglish: '',
@@ -474,7 +516,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setTransactions(prev => [...prev, ...newRows]);
-    setOrgConfig(prev => ({ ...prev, receiptCounter: (prev.receiptCounter || 1) + count }));
+    setOrgConfig(prev => ({ ...prev, receiptCounter: startNum + count }));
     if (newRows.length > 0 && !activeReceiptTransaction) {
       setActiveReceiptTransaction(newRows[0]);
     }
@@ -753,6 +795,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteCategory,
         updateOrgConfig,
         generateNextReceiptNumber,
+        rewriteReceiptNumbersAscending,
         resetToDefaultData,
         importBackupData,
         donorsSummary,

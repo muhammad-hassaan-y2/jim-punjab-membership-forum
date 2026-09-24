@@ -24,9 +24,13 @@ import {
   TableProperties,
   Share2,
   Check,
-  Pencil
+  Pencil,
+  Hash,
+  Sparkles,
+  Camera
 } from 'lucide-react';
 import { Transaction, SheetTab } from '../types/finance';
+import { GeminiReceiptScannerModal } from './GeminiReceiptScannerModal';
 import { 
   exportTransactionsToExcel, 
   exportTransactionsToCSV, 
@@ -65,6 +69,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     setIsPeriodicModalOpen,
     setIsHistoryModalOpen,
     renameSheetTab,
+    rewriteReceiptNumbersAscending,
   } = useFinance();
 
   // Active Sheet Tab filter & Sheet Number
@@ -220,6 +225,18 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     setEditingRawCell(null);
     setSelectedCell(null);
     setEditingCell(null);
+
+    // Dynamically synchronize browser URL to /dashboard/sheets/[id] or /sheets/[id]
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/dashboard/sheets') || pathname.startsWith('/sheets')) {
+        const isSheetsRoot = pathname.startsWith('/sheets');
+        const expectedPath = isSheetsRoot ? `/sheets/${activeSheetTabId}` : `/dashboard/sheets/${activeSheetTabId}`;
+        if (pathname !== expectedPath) {
+          window.history.replaceState({}, '', expectedPath);
+        }
+      }
+    }
   }, [activeSheetTabId]);
 
   const handleRawCellChange = (row: number, col: string, val: string) => {
@@ -281,23 +298,29 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const [isNewSheetModalOpen, setIsNewSheetModalOpen] = useState(false);
   const [newSheetName, setNewSheetName] = useState('');
   const [newSheetCategory, setNewSheetCategory] = useState('');
+  // Gemini AI Receipt Scanner Modal
+  const [isGeminiScannerOpen, setIsGeminiScannerOpen] = useState(false);
 
   // File import ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Column definitions matching exact specified format
   const columns: { letter: string; key: keyof Transaction; titleEn: string; width: string; align?: 'left' | 'center' | 'right' }[] = [
-    { letter: 'A', key: 'receiptNo', titleEn: 'Receipt No', width: 'w-40' },
-    { letter: 'B', key: 'date', titleEn: 'Date', width: 'w-32', align: 'center' },
-    { letter: 'C', key: 'donorName', titleEn: 'Received From', width: 'w-52' },
-    { letter: 'D', key: 'address', titleEn: 'Address', width: 'w-48' },
-    { letter: 'E', key: 'reference', titleEn: 'Reference', width: 'w-40' },
-    { letter: 'F', key: 'amount', titleEn: 'Money', width: 'w-36', align: 'right' },
-    { letter: 'G', key: 'paymentMode', titleEn: 'Cheque or CASH', width: 'w-36', align: 'center' },
-    { letter: 'H', key: 'bankName', titleEn: 'Bank Name', width: 'w-44' },
-    { letter: 'I', key: 'phone', titleEn: 'Mobile Number', width: 'w-36' },
-    { letter: 'J', key: 'categoryId', titleEn: 'Fund Category', width: 'w-44' },
-    { letter: 'K', key: 'notes', titleEn: 'Notes / Remarks', width: 'w-48' },
+    { letter: 'A', key: 'receiptNo', titleEn: 'Receipt No', width: 'w-28' },
+    { letter: 'B', key: 'date', titleEn: 'Date', width: 'w-28', align: 'center' },
+    { letter: 'C', key: 'donorName', titleEn: 'Received From', width: 'w-48' },
+    { letter: 'D', key: 'address', titleEn: 'Address', width: 'w-44' },
+    { letter: 'E', key: 'city', titleEn: 'City', width: 'w-32' },
+    { letter: 'F', key: 'monthlyAmount', titleEn: 'Monthly', width: 'w-28', align: 'right' },
+    { letter: 'G', key: 'quarterlyAmount', titleEn: 'Quarterly', width: 'w-28', align: 'right' },
+    { letter: 'H', key: 'halfYearlyAmount', titleEn: 'Half Yearly', width: 'w-28', align: 'right' },
+    { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', width: 'w-28', align: 'right' },
+    { letter: 'J', key: 'amount', titleEn: 'Total Amount as Period', width: 'w-40', align: 'right' },
+    { letter: 'K', key: 'paymentMode', titleEn: 'Cheque or CASH', width: 'w-32', align: 'center' },
+    { letter: 'L', key: 'bankName', titleEn: 'Bank Name', width: 'w-36' },
+    { letter: 'M', key: 'phone', titleEn: 'Mobile Number', width: 'w-32' },
+    { letter: 'N', key: 'categoryId', titleEn: 'Fund Category', width: 'w-36' },
+    { letter: 'O', key: 'notes', titleEn: 'Notes / Remarks', width: 'w-44' },
   ];
 
   // Filtered & Sorted Transactions
@@ -320,12 +343,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         const matchesReceipt = (t.receiptNo || '').toLowerCase().includes(query);
         const matchesName = (t.donorName || '').toLowerCase().includes(query);
         const matchesNameUrdu = (t.donorNameUrdu || '').includes(query);
-        const matchesRef = (t.reference || '').toLowerCase().includes(query);
         const matchesAddress = (t.address || '').toLowerCase().includes(query);
+        const matchesCity = (t.city || '').toLowerCase().includes(query);
         const matchesNotes = (t.notes || '').toLowerCase().includes(query);
         const matchesBank = (t.bankName || '').toLowerCase().includes(query);
 
-        if (!matchesReceipt && !matchesName && !matchesNameUrdu && !matchesRef && !matchesAddress && !matchesNotes && !matchesBank) {
+        if (!matchesReceipt && !matchesName && !matchesNameUrdu && !matchesAddress && !matchesCity && !matchesNotes && !matchesBank) {
           return false;
         }
       }
@@ -336,7 +359,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         return sortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount;
       }
       if (sortBy === 'receiptNo') {
-        return sortOrder === 'asc' ? a.receiptNo.localeCompare(b.receiptNo) : b.receiptNo.localeCompare(a.receiptNo);
+        const numA = parseInt(String(a.receiptNo || '').replace(/\D/g, ''), 10);
+        const numB = parseInt(String(b.receiptNo || '').replace(/\D/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+          return sortOrder === 'asc' ? numA - numB : numB - numA;
+        }
+        return sortOrder === 'asc' ? String(a.receiptNo || '').localeCompare(String(b.receiptNo || '')) : String(b.receiptNo || '').localeCompare(String(a.receiptNo || ''));
       }
       return sortOrder === 'asc' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime();
     });
@@ -405,10 +433,23 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // Commit inline edit
   const handleCommitEdit = (rowId: string, colKey: keyof Transaction, value: string) => {
     let finalVal: any = value;
-    if (colKey === 'amount') {
+    if (['amount', 'monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(colKey as string)) {
       finalVal = parseFloat(value) || 0;
     }
     updateCell(rowId, colKey, finalVal);
+    if (colKey === 'monthlyAmount' && finalVal > 0) {
+      updateCell(rowId, 'preferredPeriod', 'Monthly');
+      updateCell(rowId, 'amount', finalVal);
+    } else if (colKey === 'quarterlyAmount' && finalVal > 0) {
+      updateCell(rowId, 'preferredPeriod', 'Quarterly');
+      updateCell(rowId, 'amount', finalVal);
+    } else if (colKey === 'halfYearlyAmount' && finalVal > 0) {
+      updateCell(rowId, 'preferredPeriod', 'Half Yearly');
+      updateCell(rowId, 'amount', finalVal);
+    } else if (colKey === 'annuallyAmount' && finalVal > 0) {
+      updateCell(rowId, 'preferredPeriod', 'Annually');
+      updateCell(rowId, 'amount', finalVal);
+    }
     setEditingCell(null);
     setFormulaBarValue(String(finalVal));
   };
@@ -470,7 +511,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     } else {
       if (!selectedCell) return;
       let finalVal: any = formulaBarValue;
-      if (selectedCell.colKey === 'amount') {
+      if (['amount', 'monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(selectedCell.colKey as string)) {
         finalVal = parseFloat(formulaBarValue) || 0;
       }
       updateCell(selectedCell.rowId, selectedCell.colKey, finalVal);
@@ -530,7 +571,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             {!isStandaloneShareView ? (
               <>
                 <button
-                  onClick={() => setActiveTab('dashboard')}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/dashboard';
+                    } else {
+                      setActiveTab('dashboard');
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 sm:px-4.5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 font-black text-xs sm:text-sm transition-all shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
                   title="Return to Main Dashboard"
                 >
@@ -722,6 +769,32 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   +100
                 </button>
               </div>
+            )}
+
+            {/* AI Scan Picture Button (Gemini Multimodal AI) */}
+            {!isRawMode && (
+              <button
+                onClick={() => setIsGeminiScannerOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-emerald-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer"
+                title="Upload picture of receipt/voucher, let Gemini check data, confirm & enter into sheet"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-950 animate-pulse" />
+                <span>AI Scan Picture</span>
+              </button>
+            )}
+
+            {/* Rewrite Receipt Numbers Ascending (1, 2, 3...) */}
+            {!isRawMode && (
+              <button
+                onClick={() => {
+                  rewriteReceiptNumbersAscending();
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-xs font-bold shadow-2xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                title="Rewrite all receipt numbers in strict sequential ascending order (1, 2, 3...)"
+              >
+                <Hash className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Renumber (1, 2, 3...)</span>
+              </button>
             )}
 
             {/* Download Sheet (Excel) */}
@@ -1125,25 +1198,159 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700 select-none shadow-xs">
               <tr>
                 {/* Row Number Corner Box (Sticky Left) */}
-                <th className="w-12 p-2 text-center border-r border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30">
+                <th rowSpan={2} className="w-12 p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
                   #
                 </th>
 
-                {columns.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`p-2 border-r border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 ${col.width} hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center`}
-                  >
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">{col.letter}</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">{col.titleEn}</span>
-                    </div>
-                  </th>
-                ))}
+                {/* Col A: Receipt No */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
+                    <span className="text-[9px] text-slate-400">رسید نمبر</span>
+                  </div>
+                </th>
+
+                {/* Col B: Date */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Date</span>
+                    <span className="text-[9px] text-slate-400">تاریخ</span>
+                  </div>
+                </th>
+
+                {/* Col C: Received From */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-48 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Received From</span>
+                    <span className="text-[9px] text-slate-400">وصول کنندہ / اسم گرامی</span>
+                  </div>
+                </th>
+
+                {/* Col D: Address */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Address</span>
+                    <span className="text-[9px] text-slate-400">مکمل پتہ</span>
+                  </div>
+                </th>
+
+                {/* Col E: City */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">City</span>
+                    <span className="text-[9px] text-slate-400">شہر</span>
+                  </div>
+                </th>
+
+                {/* Multi-Tier Group Header: Preferred Period (Spans 4 columns: F, G, H, I) */}
+                <th colSpan={4} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-emerald-100/90 via-teal-100/90 to-emerald-100/90 dark:from-emerald-950/80 dark:via-teal-950/80 dark:to-emerald-950/80 text-emerald-900 dark:text-emerald-200">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-[12px] uppercase tracking-wider font-black">Preferred Period</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold">مدت / میعاد</span>
+                  </div>
+                </th>
+
+                {/* Col J: Total Amount as Period */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-40 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">J</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Amount as Period</span>
+                    <span className="text-[9px] text-slate-400">میعاد کے مطابق کل رقم</span>
+                  </div>
+                </th>
+
+                {/* Col K: Cheque or CASH */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">K</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Cheque or CASH</span>
+                    <span className="text-[9px] text-slate-400">ذریعہ ادائیگی</span>
+                  </div>
+                </th>
+
+                {/* Col L: Bank Name */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">L</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Bank Name</span>
+                    <span className="text-[9px] text-slate-400">بینک کا نام</span>
+                  </div>
+                </th>
+
+                {/* Col M: Mobile Number */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">M</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mobile Number</span>
+                    <span className="text-[9px] text-slate-400">موبائل نمبر</span>
+                  </div>
+                </th>
+
+                {/* Col N: Fund Category */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">N</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Fund Category</span>
+                    <span className="text-[9px] text-slate-400">مد / کھاتہ</span>
+                  </div>
+                </th>
+
+                {/* Col O: Notes / Remarks */}
+                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">O</span>
+                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Notes / Remarks</span>
+                    <span className="text-[9px] text-slate-400">تفصیل / کیفیات</span>
+                  </div>
+                </th>
 
                 {/* Actions Header */}
-                <th className="w-24 p-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs">
+                <th rowSpan={2} className="w-24 p-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-slate-300 dark:border-slate-700 align-middle">
                   Actions
+                </th>
+              </tr>
+
+              {/* Second Row: Sub-columns for Preferred Period */}
+              <tr className="bg-emerald-50/70 dark:bg-emerald-950/40">
+                {/* Col F: Monthly */}
+                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">F</span>
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Monthly</span>
+                    <span className="text-[9px] text-slate-500">ماہانہ</span>
+                  </div>
+                </th>
+
+                {/* Col G: Quarterly */}
+                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">G</span>
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Quarterly</span>
+                    <span className="text-[9px] text-slate-500">سہ ماہی</span>
+                  </div>
+                </th>
+
+                {/* Col H: Half Yearly */}
+                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">H</span>
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Half Yearly</span>
+                    <span className="text-[9px] text-slate-500">شش ماہی</span>
+                  </div>
+                </th>
+
+                {/* Col I: Annually */}
+                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
+                  <div className="flex flex-col items-center justify-center gap-0.5">
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">I</span>
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Annually</span>
+                    <span className="text-[9px] text-slate-500">سالانہ</span>
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -1309,32 +1516,157 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         )}
                       </td>
 
-                      {/* Column E: Reference */}
+                      {/* Column E: City */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'reference', 'E')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'reference')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'city', 'E')}
+                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'city')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'reference' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'city' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
                         }`}
                       >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'reference' ? (
+                        {editingCell?.rowId === tx.id && editingCell.colKey === 'city' ? (
                           <input
                             type="text"
+                            list="pakistan-cities"
                             autoFocus
                             value={cellEditValue}
                             onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'reference', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'reference', idx, cellEditValue)}
+                            onBlur={() => handleCommitEdit(tx.id, 'city', cellEditValue)}
+                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'city', idx, cellEditValue)}
                             className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                           />
                         ) : (
-                          tx.reference || '---'
+                          <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.city || '---'}</span>
                         )}
                       </td>
 
-                      {/* Column F: Money (Amount) */}
+                      {/* Column F: Monthly */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'F')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'F')}
+                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'monthlyAmount')}
+                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
+                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                        }`}
+                      >
+                        {editingCell?.rowId === tx.id && editingCell.colKey === 'monthlyAmount' ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={cellEditValue}
+                            onChange={(e) => setCellEditValue(e.target.value)}
+                            onBlur={() => handleCommitEdit(tx.id, 'monthlyAmount', cellEditValue)}
+                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'monthlyAmount', idx, cellEditValue)}
+                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                          />
+                        ) : tx.monthlyAmount && tx.monthlyAmount > 0 ? (
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            {Number(tx.monthlyAmount).toLocaleString()}
+                          </span>
+                        ) : tx.preferredPeriod === 'Monthly' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+
+                      {/* Column G: Quarterly */}
+                      <td 
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'G')}
+                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'quarterlyAmount')}
+                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
+                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                        }`}
+                      >
+                        {editingCell?.rowId === tx.id && editingCell.colKey === 'quarterlyAmount' ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={cellEditValue}
+                            onChange={(e) => setCellEditValue(e.target.value)}
+                            onBlur={() => handleCommitEdit(tx.id, 'quarterlyAmount', cellEditValue)}
+                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'quarterlyAmount', idx, cellEditValue)}
+                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                          />
+                        ) : tx.quarterlyAmount && tx.quarterlyAmount > 0 ? (
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            {Number(tx.quarterlyAmount).toLocaleString()}
+                          </span>
+                        ) : tx.preferredPeriod === 'Quarterly' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+
+                      {/* Column H: Half Yearly */}
+                      <td 
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'halfYearlyAmount', 'H')}
+                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'halfYearlyAmount')}
+                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
+                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'halfYearlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                        }`}
+                      >
+                        {editingCell?.rowId === tx.id && editingCell.colKey === 'halfYearlyAmount' ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={cellEditValue}
+                            onChange={(e) => setCellEditValue(e.target.value)}
+                            onBlur={() => handleCommitEdit(tx.id, 'halfYearlyAmount', cellEditValue)}
+                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'halfYearlyAmount', idx, cellEditValue)}
+                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                          />
+                        ) : tx.halfYearlyAmount && tx.halfYearlyAmount > 0 ? (
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            {Number(tx.halfYearlyAmount).toLocaleString()}
+                          </span>
+                        ) : tx.preferredPeriod === 'Half Yearly' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+
+                      {/* Column I: Annually */}
+                      <td 
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'I')}
+                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'annuallyAmount')}
+                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
+                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                        }`}
+                      >
+                        {editingCell?.rowId === tx.id && editingCell.colKey === 'annuallyAmount' ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={cellEditValue}
+                            onChange={(e) => setCellEditValue(e.target.value)}
+                            onBlur={() => handleCommitEdit(tx.id, 'annuallyAmount', cellEditValue)}
+                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'annuallyAmount', idx, cellEditValue)}
+                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                          />
+                        ) : tx.annuallyAmount && tx.annuallyAmount > 0 ? (
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            {Number(tx.annuallyAmount).toLocaleString()}
+                          </span>
+                        ) : tx.preferredPeriod === 'Annually' ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
+                        )}
+                      </td>
+
+                      {/* Column J: Total Amount as Period */}
+                      <td 
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'J')}
                         onDoubleClick={() => handleCellDoubleClick(tx.id, 'amount')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
@@ -1357,9 +1689,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         )}
                       </td>
 
-                      {/* Column G: Cheque or CASH */}
+                      {/* Column K: Cheque or CASH */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'G')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'K')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 text-center ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
                         }`}
@@ -1376,9 +1708,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         </select>
                       </td>
 
-                      {/* Column H: Bank Name */}
+                      {/* Column L: Bank Name */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'H')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'L')}
                         onDoubleClick={() => handleCellDoubleClick(tx.id, 'bankName')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
@@ -1399,9 +1731,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         )}
                       </td>
 
-                      {/* Column I: Mobile Number */}
+                      {/* Column M: Mobile Number */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'I')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'M')}
                         onDoubleClick={() => handleCellDoubleClick(tx.id, 'phone')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono cursor-cell ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
@@ -1422,9 +1754,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         )}
                       </td>
 
-                      {/* Column J: Fund Category */}
+                      {/* Column N: Fund Category */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'categoryId', 'J')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'categoryId', 'N')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-pointer ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'categoryId' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
                         }`}
@@ -1442,9 +1774,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         </select>
                       </td>
 
-                      {/* Column K: Notes / Remarks */}
+                      {/* Column O: Notes / Remarks */}
                       <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'K')}
+                        onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'O')}
                         onDoubleClick={() => handleCellDoubleClick(tx.id, 'notes')}
                         className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
                           selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
@@ -1700,6 +2032,56 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         </div>
       )}
 
+      {/* AUTHENTIC GOOGLE SHEETS / EXCEL STYLE FIXED BOTTOM BAR */}
+      <div className="sticky bottom-0 z-30 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-3 py-1.5 flex items-center justify-between shadow-md">
+        {/* Left: + Add Sheet button & Sheet Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5 scrollbar-thin">
+          <button
+            onClick={() => createTemplateSheet()}
+            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer"
+            title="Add New Sheet Tab"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span className="hidden sm:inline">Add Sheet</span>
+          </button>
+          
+          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 shrink-0 mx-1" />
+
+          {sheetTabs.map((sheet, index) => {
+            const sheetNumber = index + 1;
+            const isSelected = activeSheetTabId === sheet.id;
+            return (
+              <button
+                key={sheet.id}
+                onClick={() => {
+                  setActiveSheetTabId(sheet.id);
+                  if (typeof window !== 'undefined') {
+                    const isSheetsRoot = window.location.pathname.startsWith('/sheets');
+                    const newPath = isSheetsRoot ? `/sheets/${sheet.id}` : `/dashboard/sheets/${sheet.id}`;
+                    window.history.pushState({}, '', newPath);
+                  }
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 border cursor-pointer ${
+                  isSelected
+                    ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 border-emerald-500 shadow-2xs'
+                    : 'bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border-transparent'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>{sheet.name || `Sheet ${sheetNumber}`}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: Status indicator */}
+        <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0 pl-2">
+          <span>{sheetTabs.length} sheets active</span>
+          <span>•</span>
+          <span>Database synced</span>
+        </div>
+      </div>
+
       {/* NEW SHEET MODAL */}
       {isNewSheetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -1777,6 +2159,33 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           </div>
         </div>
       )}
+
+      {/* Gemini AI Receipt Scanner Modal */}
+      <GeminiReceiptScannerModal
+        isOpen={isGeminiScannerOpen}
+        onClose={() => setIsGeminiScannerOpen(false)}
+      />
+
+      {/* Autocomplete Datalist for Pakistan Cities */}
+      <datalist id="pakistan-cities">
+        <option value="Karachi" />
+        <option value="Lahore" />
+        <option value="Islamabad" />
+        <option value="Rawalpindi" />
+        <option value="Faisalabad" />
+        <option value="Multan" />
+        <option value="Hyderabad" />
+        <option value="Peshawar" />
+        <option value="Quetta" />
+        <option value="Gujranwala" />
+        <option value="Sialkot" />
+        <option value="Sukkur" />
+        <option value="Larkana" />
+        <option value="Kandiaro" />
+        <option value="Naushahro Feroze" />
+        <option value="Bahawalpur" />
+        <option value="Sargodha" />
+      </datalist>
 
     </div>
   );
