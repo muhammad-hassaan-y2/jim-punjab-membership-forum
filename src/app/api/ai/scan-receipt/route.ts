@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageBase64, mimeType = 'image/jpeg' } = await req.json();
+    const body = await req.json();
+    const { 
+      imageBase64, 
+      mimeType = 'image/jpeg', 
+      fileName = 'document',
+      categories = []
+    } = body;
 
     if (!imageBase64) {
       return NextResponse.json(
-        { success: false, error: 'No image data provided' },
+        { success: false, error: 'No document or image data provided' },
         { status: 400 }
       );
     }
@@ -22,31 +28,59 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = `You are an expert AI accountant and document analyst specialized in institutional financial receipts, handwritten donation slips (چندہ پرچی), vouchers, Islamic charity receipts (Zakat, Fitrana, Sadaqat, Madrasa, Welfare), bank deposit slips, invoices, and payment receipts in English and Urdu.
+    // Determine normalized MIME type
+    let finalMimeType = mimeType;
+    if (fileName.toLowerCase().endsWith('.pdf') || mimeType === 'application/pdf') {
+      finalMimeType = 'application/pdf';
+    } else if (fileName.toLowerCase().endsWith('.png') || mimeType.includes('png')) {
+      finalMimeType = 'image/png';
+    } else if (fileName.toLowerCase().endsWith('.webp') || mimeType.includes('webp')) {
+      finalMimeType = 'image/webp';
+    } else {
+      finalMimeType = 'image/jpeg';
+    }
 
-Analyze the image carefully and extract all transaction details into a strict JSON format with these exact keys:
-- "receiptNo": string or null (e.g. "1", "105", "REC-045" if explicitly written, otherwise null)
-- "date": string in YYYY-MM-DD format (if only DD/MM/YYYY or Urdu date like 24 ستمبر 2026, convert to YYYY-MM-DD; null if missing)
-- "donorName": string (name of the person/organization making the payment or donation, in English or Urdu)
-- "donorNameUrdu": string or null (Urdu transliteration/original name if visible)
-- "address": string (street, mohalla, or area; empty string if none)
-- "city": string (city name, e.g. Karachi, Lahore, Rawalpindi, Islamabad, Multan, Hyderabad, Kandiaro, Sukkur, Faisalabad, Peshawar, Quetta, etc.; empty string if not found)
-- "preferredPeriod": string or null (Must be one of "Monthly", "Quarterly", "Half Yearly", "Annually", or null)
-- "monthlyAmount": number or null (monthly donation amount if stated, else null)
-- "quarterlyAmount": number or null (quarterly amount if stated, else null)
-- "halfYearlyAmount": number or null (half-yearly amount if stated, else null)
-- "annuallyAmount": number or null (annual amount if stated, else null)
-- "amount": number (Total amount paid/received in numbers. If amount is in words e.g. "پندرہ ہزار", convert to 15000. Must be a positive number)
-- "amountInWords": string or null (amount in words if written)
-- "paymentMode": string (Must be one of: "Cash", "Cheque", "Online", "DD")
-- "bankName": string (e.g. "Meezan Bank", "Allied Bank", "HBL", "MCB", "UBL", or empty string if Cash)
-- "phone": string (mobile number or phone if written, else empty string)
-- "categoryId": string (institutional fund classification: "zakat" for زکوٰۃ, "fitrat" for فطرانہ, "sadqat" for صدقات, "khirat" for خیرات, "charam_qurbani" for چرم قربانی, "membership" for ممبر شپ, "madrassah" for مدرسہ, or "general" for general donation)
-- "notes": string (brief summary of purpose or any notes written on the receipt)
-- "rawSummary": string (1-2 sentence concise executive explanation of what was detected in the image)
-- "confidence": number (from 0 to 1, e.g. 0.95)
+    const categoriesListStr = categories && categories.length > 0 
+      ? categories.map((c: any) => `"${c.id}" (${c.nameEnglish} / ${c.nameUrdu || ''})`).join(', ')
+      : '"zakat" (Zakat), "sadqat" (Sadaqat), "fitrat" (Fitrana), "madrassah" (Madrasa Fund), "construction" (Construction Fund), "membership" (Membership), "general" (General Donations)';
 
-Return ONLY valid JSON. No conversational preamble, markdown backticks, or extra text.`;
+    const systemPrompt = `You are an expert AI accountant and document analyst specialized in institutional financial receipts, invoices, bank deposit slips, payment vouchers, handwritten donation slips (چندہ پرچی), and multi-entry financial records in English, Urdu, and Arabic numerals.
+
+Analyze the uploaded document or image carefully.
+It may be a single receipt/voucher, or a document/ledger page with multiple donation entries.
+
+Extract ALL financial transaction records into a strict JSON format with this exact structure:
+{
+  "entries": [
+    {
+      "receiptNo": string or null,
+      "date": "YYYY-MM-DD" or null (convert DD/MM/YYYY or Urdu dates e.g. "25 ستمبر 2026" to YYYY-MM-DD),
+      "donorName": string (Name of contributor, payer, or organization),
+      "donorNameUrdu": string or null,
+      "phone": string (mobile number if present, else ""),
+      "address": string (street, area, or address; empty string if none),
+      "city": string (city name e.g. Karachi, Lahore, Rawalpindi, Islamabad, Multan, Hyderabad, Kandiaro, Sukkur, Faisalabad, etc.; empty string if not stated),
+      "preferredPeriod": "Monthly" | "Quarterly" | "Half Yearly" | "Annually" | null,
+      "monthlyAmount": number or null (amount if specified for monthly, else null),
+      "quarterlyAmount": number or null (amount if specified for quarterly, else null),
+      "halfYearlyAmount": number or null (amount if specified for half yearly, else null),
+      "annuallyAmount": number or null (amount if specified for annually, else null),
+      "amount": number (Total amount in numeric digits. If written in words e.g. "دس ہزار", convert to 10000. Must be a positive number),
+      "amountInWords": string or null,
+      "paymentMode": "Cash" | "Cheque" | "Online" | "DD",
+      "bankName": string (e.g. "Meezan Bank", "HBL", "Allied Bank", "MCB", "UBL", etc. Empty string if Cash),
+      "categoryId": string (Must match one of available categories: ${categoriesListStr}. Default to "general" or "zakat" based on context),
+      "notes": string (brief summary of purpose or notations on the document)
+    }
+  ],
+  "rawSummary": string (1-2 sentence executive explanation of what document was analyzed and total records/amounts detected),
+  "confidence": number (between 0.0 and 1.0)
+}
+
+Rules:
+1. If there is only 1 transaction on the receipt, "entries" must contain that 1 object.
+2. If there are multiple entries/rows on a donation sheet or voucher, include an object for EACH entry in "entries".
+3. Always return valid JSON only. No markdown ticks, no preamble.`;
 
     const candidateModels = [
       'gemini-3.5-flash',
@@ -70,7 +104,7 @@ Return ONLY valid JSON. No conversational preamble, markdown backticks, or extra
                   { text: systemPrompt },
                   {
                     inlineData: {
-                      mimeType: mimeType || 'image/jpeg',
+                      mimeType: finalMimeType,
                       data: cleanBase64,
                     },
                   },
@@ -91,18 +125,23 @@ Return ONLY valid JSON. No conversational preamble, markdown backticks, or extra
         }
 
         const resJson = await response.json();
-        const textOutput = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parts = resJson?.candidates?.[0]?.content?.parts || [];
+        const fullText = parts.map((p: any) => p.text || '').join('\n').trim();
 
-        if (textOutput) {
+        if (fullText) {
           try {
-            extractedData = JSON.parse(textOutput);
-            break;
-          } catch (parseErr) {
-            // Try cleaning markdown ticks if present
-            const cleaned = textOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
-            extractedData = JSON.parse(cleaned);
-            break;
+            // First try direct JSON.parse
+            let clean = fullText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            extractedData = JSON.parse(clean);
+          } catch (e1) {
+            // Fallback: match outermost { ... }
+            const jsonMatch = fullText.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+            if (jsonMatch) {
+              extractedData = JSON.parse(jsonMatch[1]);
+            }
           }
+
+          if (extractedData) break;
         }
       } catch (err: any) {
         lastError = err;
@@ -110,17 +149,62 @@ Return ONLY valid JSON. No conversational preamble, markdown backticks, or extra
     }
 
     if (!extractedData) {
-      throw lastError || new Error('Failed to extract data from image with Gemini');
+      throw lastError || new Error('Gemini could not analyze the document.');
     }
+
+    // Normalize entries: handle single object or multi-entries
+    let entries: any[] = [];
+    if (Array.isArray(extractedData.entries)) {
+      entries = extractedData.entries;
+    } else if (Array.isArray(extractedData)) {
+      entries = extractedData;
+    } else if (extractedData.receiptNo !== undefined || extractedData.amount !== undefined || extractedData.donorName !== undefined) {
+      entries = [extractedData];
+    } else if (extractedData.transactions && Array.isArray(extractedData.transactions)) {
+      entries = extractedData.transactions;
+    } else {
+      entries = [extractedData];
+    }
+
+    // Clean and validate each entry
+    const normalizedEntries = entries.map((entry: any, idx: number) => {
+      const amount = Number(entry.amount) || 0;
+      const period = entry.preferredPeriod || (entry.monthlyAmount ? 'Monthly' : entry.annuallyAmount ? 'Annually' : 'Monthly');
+      
+      return {
+        receiptNo: entry.receiptNo && String(entry.receiptNo).trim() !== '' ? String(entry.receiptNo).trim() : null,
+        date: entry.date || new Date().toISOString().split('T')[0],
+        donorName: entry.donorName || `Donor #${idx + 1}`,
+        donorNameUrdu: entry.donorNameUrdu || null,
+        phone: entry.phone || '',
+        address: entry.address || '',
+        city: entry.city || 'Karachi',
+        preferredPeriod: period,
+        monthlyAmount: entry.monthlyAmount || (period === 'Monthly' ? amount : 0),
+        quarterlyAmount: entry.quarterlyAmount || (period === 'Quarterly' ? amount : 0),
+        halfYearlyAmount: entry.halfYearlyAmount || (period === 'Half Yearly' ? amount : 0),
+        annuallyAmount: entry.annuallyAmount || (period === 'Annually' ? amount : 0),
+        amount: amount,
+        amountInWords: entry.amountInWords || null,
+        paymentMode: ['Cash', 'Cheque', 'Online', 'DD'].includes(entry.paymentMode) ? entry.paymentMode : 'Cash',
+        bankName: entry.bankName || '',
+        categoryId: entry.categoryId || 'general',
+        notes: entry.notes || 'Verified from document via Gemini AI',
+      };
+    });
 
     return NextResponse.json({
       success: true,
-      data: extractedData,
+      data: {
+        entries: normalizedEntries,
+        rawSummary: extractedData.rawSummary || `Successfully extracted ${normalizedEntries.length} transaction record(s) from document.`,
+        confidence: extractedData.confidence ?? 0.95,
+      },
     });
   } catch (error: any) {
-    console.error('Gemini receipt scan error:', error);
+    console.error('Gemini document scan error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error processing image' },
+      { success: false, error: error.message || 'Internal server error processing document' },
       { status: 500 }
     );
   }

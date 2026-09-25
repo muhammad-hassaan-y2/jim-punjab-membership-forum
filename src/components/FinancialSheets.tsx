@@ -771,17 +771,15 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               </div>
             )}
 
-            {/* AI Scan Picture Button (Gemini Multimodal AI) */}
-            {!isRawMode && (
-              <button
-                onClick={() => setIsGeminiScannerOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-emerald-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer"
-                title="Upload picture of receipt/voucher, let Gemini check data, confirm & enter into sheet"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-950 animate-pulse" />
-                <span>AI Scan Picture</span>
-              </button>
-            )}
+            {/* AI Scan Document & Receipt Button (Gemini Multimodal AI) */}
+            <button
+              onClick={() => setIsGeminiScannerOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-emerald-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer"
+              title="Upload document or picture of receipt/voucher, let Gemini check data, confirm & enter into sheet"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-950 animate-pulse" />
+              <span>AI Scan Document</span>
+            </button>
 
             {/* Rewrite Receipt Numbers Ascending (1, 2, 3...) */}
             {!isRawMode && (

@@ -158,13 +158,13 @@ export const AISheetModal: React.FC<AISheetModalProps> = ({ isOpen, onClose }) =
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="font-black text-sm text-white">Upload Receipt Picture</h4>
+                  <h4 className="font-black text-sm text-white">Upload Documents &amp; Receipts</h4>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-emerald-950 font-bold">
-                    Gemini Vision
+                    Gemini AI
                   </span>
                 </div>
                 <p className="text-[11px] text-emerald-200/90 mt-0.5">
-                  AI checks what's in picture, confirms details with you, then enters into sheet.
+                  Upload PDF documents or images; Gemini checks what's in it, confirms data with you, then enters into sheet.
                 </p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export const AISheetModal: React.FC<AISheetModalProps> = ({ isOpen, onClose }) =
               className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-emerald-950 font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer hover:scale-105 active:scale-95"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Scan Picture Now</span>
+              <span>Upload Document / Picture</span>
             </button>
           </div>
 

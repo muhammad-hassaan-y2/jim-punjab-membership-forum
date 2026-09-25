@@ -9,7 +9,6 @@ import {
   Check, 
   AlertCircle, 
   FileText, 
-  Receipt, 
   RefreshCw, 
   CheckCircle2, 
   Eye, 
@@ -22,14 +21,39 @@ import {
   Tag, 
   CreditCard,
   Camera,
-  Image as ImageIcon
+  Image as ImageIcon,
+  FileCode,
+  ExternalLink,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Transaction } from '../types/finance';
 
 interface GeminiReceiptScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+}
+
+interface ExtractedEntry {
+  receiptNo: string;
+  date: string;
+  donorName: string;
+  donorNameUrdu?: string | null;
+  phone: string;
+  address: string;
+  city: string;
+  preferredPeriod: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually';
+  monthlyAmount: number;
+  quarterlyAmount: number;
+  halfYearlyAmount: number;
+  annuallyAmount: number;
+  amount: number;
+  paymentMode: 'Cash' | 'Cheque' | 'Online' | 'DD';
+  bankName: string;
+  categoryId: string;
+  notes: string;
 }
 
 export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps> = ({
@@ -41,7 +65,9 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
     categories, 
     generateNextReceiptNumber, 
     addTransaction, 
+    sheetTabs,
     activeSheetTabId,
+    setActiveSheetTabId,
     orgConfig 
   } = useFinance();
 
@@ -49,79 +75,82 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
 
   // Workflow states: 'upload' -> 'scanning' -> 'confirm' -> 'success'
   const [step, setStep] = useState<'upload' | 'scanning' | 'confirm' | 'success'>('upload');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageMimeType, setImageMimeType] = useState<string>('image/jpeg');
+  
+  // File state
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [fileMimeType, setFileMimeType] = useState<string>('image/jpeg');
+  const [fileName, setFileName] = useState<string>('');
+  const [fileSizeStr, setFileSizeStr] = useState<string>('');
+  const [isPdf, setIsPdf] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiSummary, setAiSummary] = useState<string>('');
 
-  // Editable Form Data for Confirmation Step
-  const [formData, setFormData] = useState({
-    receiptNo: '',
-    date: new Date().toISOString().split('T')[0],
-    donorName: '',
-    address: '',
-    city: 'Karachi',
-    preferredPeriod: 'Monthly' as 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually',
-    monthlyAmount: 0,
-    quarterlyAmount: 0,
-    halfYearlyAmount: 0,
-    annuallyAmount: 0,
-    amount: 0,
-    paymentMode: 'Cash' as 'Cash' | 'Cheque' | 'Online' | 'DD',
-    bankName: '',
-    phone: '',
-    categoryId: 'zakat',
-    notes: '',
-  });
+  // Target destination sheet
+  const [targetSheetId, setTargetSheetId] = useState<string>(activeSheetTabId || 'sheet1');
+
+  // Single vs Multiple Entries state
+  const [entries, setEntries] = useState<ExtractedEntry[]>([]);
+  const [activeEntryIndex, setActiveEntryIndex] = useState<number>(0);
 
   if (!isOpen) return null;
 
-  // Handle File Selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const currentTargetSheet = sheetTabs.find(t => t.id === targetSheetId) || sheetTabs[0];
 
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('Please select a valid image file (PNG, JPG, WEBP).');
+  // Helper to format file size
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Process selected file (Document or Image)
+  const processUploadedFile = (file: File) => {
+    const isFilePdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isFileImage = file.type.startsWith('image/');
+
+    if (!isFilePdf && !isFileImage) {
+      setErrorMessage('Please upload a supported document (PDF) or picture (PNG, JPG, WEBP).');
       return;
     }
 
-    setImageMimeType(file.type);
+    if (file.size > 20 * 1024 * 1024) {
+      setErrorMessage('File size exceeds 20MB limit. Please upload a smaller document.');
+      return;
+    }
+
+    setIsPdf(isFilePdf);
+    setFileName(file.name);
+    setFileSizeStr(formatBytes(file.size));
+    const mime = isFilePdf ? 'application/pdf' : (file.type || 'image/jpeg');
+    setFileMimeType(mime);
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
-      setImagePreview(result);
+      setFilePreview(result);
       setErrorMessage(null);
-      // Automatically trigger scan once image is loaded
-      startScanning(result, file.type);
+      startScanning(result, mime, file.name);
     };
     reader.readAsDataURL(file);
   };
 
-  // Drag and drop handler
+  // Handle File Input Change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processUploadedFile(file);
+  };
+
+  // Handle Drag and Drop
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('Please drop an image file (PNG, JPG, WEBP).');
-      return;
-    }
-
-    setImageMimeType(file.type);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setImagePreview(result);
-      setErrorMessage(null);
-      startScanning(result, file.type);
-    };
-    reader.readAsDataURL(file);
+    processUploadedFile(file);
   };
 
-  // Run Gemini AI Vision Pipeline
-  const startScanning = async (base64Img: string, mime: string) => {
+  // Run Gemini AI Document Pipeline
+  const startScanning = async (base64Data: string, mime: string, name: string) => {
     setStep('scanning');
     setErrorMessage(null);
 
@@ -130,145 +159,277 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: base64Img,
+          imageBase64: base64Data,
           mimeType: mime,
+          fileName: name,
+          categories: categories.map(c => ({ id: c.id, nameEnglish: c.nameEnglish, nameUrdu: c.nameUrdu }))
         }),
       });
 
       const json = await res.json();
 
       if (!json.success || !json.data) {
-        throw new Error(json.error || 'Gemini could not detect receipt data');
+        throw new Error(json.error || 'Gemini could not detect data from the document');
       }
 
-      const extracted = json.data;
-      const nextReceipt = generateNextReceiptNumber();
+      const extractedEntries = json.data.entries || [];
+      const summary = json.data.rawSummary || 'Successfully recognized document data.';
 
-      // Match category
-      let matchedCategory = categories[0]?.id || 'general';
-      if (extracted.categoryId) {
-        const found = categories.find(
-          c => c.id.toLowerCase() === extracted.categoryId.toLowerCase() ||
-               c.nameEnglish.toLowerCase().includes(extracted.categoryId.toLowerCase())
-        );
-        if (found) matchedCategory = found.id;
+      if (extractedEntries.length === 0) {
+        throw new Error('No financial records found in document.');
       }
 
-      // Populate confirmation form
-      setFormData({
-        receiptNo: extracted.receiptNo && extracted.receiptNo.trim() !== '' ? extracted.receiptNo : nextReceipt,
-        date: extracted.date || new Date().toISOString().split('T')[0],
-        donorName: extracted.donorName || 'Generous Donor (خیر خواہ)',
-        address: extracted.address || '',
-        city: extracted.city || 'Karachi',
-        preferredPeriod: (extracted.preferredPeriod as any) || 'Monthly',
-        monthlyAmount: extracted.monthlyAmount || (extracted.preferredPeriod === 'Monthly' ? extracted.amount : 0) || 0,
-        quarterlyAmount: extracted.quarterlyAmount || (extracted.preferredPeriod === 'Quarterly' ? extracted.amount : 0) || 0,
-        halfYearlyAmount: extracted.halfYearlyAmount || (extracted.preferredPeriod === 'Half Yearly' ? extracted.amount : 0) || 0,
-        annuallyAmount: extracted.annuallyAmount || (extracted.preferredPeriod === 'Annually' ? extracted.amount : 0) || 0,
-        amount: Number(extracted.amount) || 0,
-        paymentMode: (extracted.paymentMode as any) || 'Cash',
-        bankName: extracted.bankName || '',
-        phone: extracted.phone || '',
-        categoryId: matchedCategory,
-        notes: extracted.notes || 'Verified via Gemini AI Multimodal Vision Scan',
+      // Map categories and fill defaults
+      const mappedEntries: ExtractedEntry[] = extractedEntries.map((raw: any, idx: number) => {
+        let matchedCat = categories[0]?.id || 'general';
+        if (raw.categoryId) {
+          const found = categories.find(
+            c => c.id.toLowerCase() === String(raw.categoryId).toLowerCase() ||
+                 c.nameEnglish.toLowerCase().includes(String(raw.categoryId).toLowerCase())
+          );
+          if (found) matchedCat = found.id;
+        }
+
+        const amt = Number(raw.amount) || 0;
+        const period: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually' = 
+          ['Monthly', 'Quarterly', 'Half Yearly', 'Annually'].includes(raw.preferredPeriod)
+            ? raw.preferredPeriod
+            : 'Monthly';
+
+        return {
+          receiptNo: raw.receiptNo ? String(raw.receiptNo) : '',
+          date: raw.date || new Date().toISOString().split('T')[0],
+          donorName: raw.donorName || `Donor #${idx + 1}`,
+          donorNameUrdu: raw.donorNameUrdu || null,
+          phone: raw.phone || '',
+          address: raw.address || '',
+          city: raw.city || 'Karachi',
+          preferredPeriod: period,
+          monthlyAmount: raw.monthlyAmount || (period === 'Monthly' ? amt : 0),
+          quarterlyAmount: raw.quarterlyAmount || (period === 'Quarterly' ? amt : 0),
+          halfYearlyAmount: raw.halfYearlyAmount || (period === 'Half Yearly' ? amt : 0),
+          annuallyAmount: raw.annuallyAmount || (period === 'Annually' ? amt : 0),
+          amount: amt,
+          paymentMode: ['Cash', 'Cheque', 'Online', 'DD'].includes(raw.paymentMode) ? raw.paymentMode : 'Cash',
+          bankName: raw.bankName || '',
+          categoryId: matchedCat,
+          notes: raw.notes || 'Verified from document via Gemini AI',
+        };
       });
 
-      setAiSummary(extracted.rawSummary || 'Successfully recognized financial details from receipt picture.');
+      setEntries(mappedEntries);
+      setActiveEntryIndex(0);
+      setAiSummary(summary);
       setStep('confirm');
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || 'Error communicating with Gemini AI. You can enter details manually.');
-      setStep('confirm'); // Let user confirm/edit manually
+      setErrorMessage(err.message || 'Error processing document with Gemini. You can review or enter details manually.');
+      // Create fallback entry so user isn't blocked
+      setEntries([{
+        receiptNo: generateNextReceiptNumber(),
+        date: new Date().toISOString().split('T')[0],
+        donorName: 'Generous Contributor (خیر خواہ)',
+        phone: '',
+        address: '',
+        city: 'Karachi',
+        preferredPeriod: 'Monthly',
+        monthlyAmount: 0,
+        quarterlyAmount: 0,
+        halfYearlyAmount: 0,
+        annuallyAmount: 0,
+        amount: 0,
+        paymentMode: 'Cash',
+        bankName: '',
+        categoryId: categories[0]?.id || 'general',
+        notes: 'Document manual entry fallback',
+      }]);
+      setActiveEntryIndex(0);
+      setStep('confirm');
     }
   };
 
   // Sample voucher for one-click testing
-  const handleLoadSample = (sampleType: 'zakat' | 'sadaqat') => {
-    // Generate an SVG receipt data URL for instant visual test
+  const handleLoadSample = (sampleType: 'zakat' | 'sadaqat' | 'pdf_multi') => {
+    if (sampleType === 'pdf_multi') {
+      // Test sample PDF containing multiple donations
+      setIsPdf(true);
+      setFileName('Markaz_Donations_Register_2026.pdf');
+      setFileSizeStr('45.2 KB');
+      setFileMimeType('application/pdf');
+      
+      const samplePdfBase64 = 'JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCA0NQo+PgpzdHJlYW0KQlQKL0YxIDI0IFRmCjEwMCA3MDAgVGROCihNYXJrYXogUm9vaCB1bCBJc2xhbSBEb25hdGlvbiBSZWdpc3RlcjogUmVjZWlwdCAjMTAxIFJzIDUwMDAsIFJlY2VpcHQgIzEwMiBScyAxMjAwMCkgVGoKRVQKZW5kc3RyZWFtCmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAwMDkgMDAwMDAgbiAKMDAwMDAwMDA1OCAwMDAwMCBuIAowMDAwMDAwMTE1IDAwMDAwIG4gCjAwMDAwMDAyMDEgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA1Ci9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgorMTkKJSVFT0Y=';
+      const dataUri = `data:application/pdf;base64,${samplePdfBase64}`;
+      setFilePreview(dataUri);
+      startScanning(dataUri, 'application/pdf', 'Markaz_Donations_Register_2026.pdf');
+      return;
+    }
+
+    setIsPdf(false);
+    setFileName(sampleType === 'zakat' ? 'Zakat_Monthly_Slip.png' : 'Welfare_Voucher.png');
+    setFileSizeStr('18.4 KB');
+    setFileMimeType('image/png');
+
     const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 400;
+    canvas.width = 650;
+    canvas.height = 420;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Receipt background
+      // Paper background
       ctx.fillStyle = '#fefce8';
-      ctx.fillRect(0, 0, 600, 400);
+      ctx.fillRect(0, 0, 650, 420);
       ctx.strokeStyle = '#ca8a04';
       ctx.lineWidth = 4;
-      ctx.strokeRect(10, 10, 580, 380);
+      ctx.strokeRect(12, 12, 626, 396);
 
       // Header
       ctx.fillStyle = '#064e3b';
       ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('MARKAZ ROOH UL ISLAM - OFFICIAL RECEIPT', 50, 50);
+      ctx.fillText('MARKAZ ROOH UL ISLAM - OFFICIAL RECEIPT', 60, 55);
 
       ctx.fillStyle = '#854d0e';
       ctx.font = '16px sans-serif';
-      ctx.fillText('چندہ رسید برائے فنڈ و عطیات', 220, 80);
+      ctx.fillText('چندہ رسید برائے فنڈ و عطیات', 240, 85);
 
-      // Receipt details
       ctx.fillStyle = '#0f172a';
       ctx.font = '14px sans-serif';
       if (sampleType === 'zakat') {
-        ctx.fillText('Receipt No: REC-1088', 50, 120);
-        ctx.fillText('Date: 2026-09-24', 380, 120);
-        ctx.fillText('Received From: Haji Muhammad Tariq (حاجی محمد طارق)', 50, 160);
-        ctx.fillText('Address: Tariq Road, PECHS Block 2', 50, 200);
-        ctx.fillText('City: Karachi', 380, 200);
-        ctx.fillText('Preferred Period: Monthly (ماہانہ)', 50, 240);
-        ctx.fillText('Amount: Rs. 25,000 (Twenty Five Thousand Only)', 50, 280);
-        ctx.fillText('Fund: Zakat & Madrasa Fund (زکوٰۃ)', 50, 320);
-        ctx.fillText('Mode: Online Transfer - Meezan Bank', 50, 360);
+        ctx.fillText('Receipt No: REC-1088', 60, 130);
+        ctx.fillText('Date: 2026-09-25', 400, 130);
+        ctx.fillText('Received From: Haji Muhammad Tariq (حاجی محمد طارق)', 60, 170);
+        ctx.fillText('Address: Tariq Road, PECHS Block 2', 60, 210);
+        ctx.fillText('City: Karachi', 400, 210);
+        ctx.fillText('Preferred Period: Monthly (ماہانہ)', 60, 250);
+        ctx.fillText('Amount: Rs. 25,000 (Twenty Five Thousand Only)', 60, 290);
+        ctx.fillText('Fund: Zakat & Madrasa Fund (زکوٰۃ)', 60, 330);
+        ctx.fillText('Mode: Online Transfer - Meezan Bank', 60, 370);
       } else {
-        ctx.fillText('Receipt No: REC-2041', 50, 120);
-        ctx.fillText('Date: 2026-09-24', 380, 120);
-        ctx.fillText('Received From: Al-Syed Construction Trust', 50, 160);
-        ctx.fillText('Address: Main Boulevard, Gulberg III', 50, 200);
-        ctx.fillText('City: Lahore', 380, 200);
-        ctx.fillText('Preferred Period: Annually (سالانہ)', 50, 240);
-        ctx.fillText('Amount: Rs. 100,000 (One Hundred Thousand Only)', 50, 280);
-        ctx.fillText('Fund: General Sadaqat & Welfare', 50, 320);
-        ctx.fillText('Mode: Cash', 50, 360);
+        ctx.fillText('Receipt No: REC-2041', 60, 130);
+        ctx.fillText('Date: 2026-09-25', 400, 130);
+        ctx.fillText('Received From: Al-Syed Construction Trust', 60, 170);
+        ctx.fillText('Address: Main Boulevard, Gulberg III', 60, 210);
+        ctx.fillText('City: Lahore', 400, 210);
+        ctx.fillText('Preferred Period: Annually (سالانہ)', 60, 250);
+        ctx.fillText('Amount: Rs. 100,000 (One Hundred Thousand Only)', 60, 290);
+        ctx.fillText('Fund: General Sadaqat & Welfare', 60, 330);
+        ctx.fillText('Mode: Cash', 60, 370);
       }
     }
 
     const dataUrl = canvas.toDataURL('image/png');
-    setImagePreview(dataUrl);
-    setImageMimeType('image/png');
-    startScanning(dataUrl, 'image/png');
+    setFilePreview(dataUrl);
+    startScanning(dataUrl, 'image/png', fileName);
   };
 
-  // User Confirms Data -> Enters Row Directly into Active Sheet
-  const handleConfirmAndEnter = async () => {
-    try {
-      await addTransaction({
-        receiptNo: formData.receiptNo,
-        date: formData.date,
-        donorName: formData.donorName,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        preferredPeriod: formData.preferredPeriod,
-        monthlyAmount: formData.monthlyAmount,
-        quarterlyAmount: formData.quarterlyAmount,
-        halfYearlyAmount: formData.halfYearlyAmount,
-        annuallyAmount: formData.annuallyAmount,
-        amount: Number(formData.amount) || 0,
-        categoryId: formData.categoryId,
-        paymentMode: formData.paymentMode,
-        bankName: formData.bankName,
-        chequeOrTxnNo: `AI-${Date.now().toString().slice(-4)}`,
-        type: 'income',
-        status: 'verified',
-        notes: formData.notes,
-      });
+  // Update specific field for currently active entry
+  const updateCurrentEntry = (field: keyof ExtractedEntry, value: any) => {
+    setEntries(prev => {
+      const updated = [...prev];
+      const cur = { ...updated[activeEntryIndex], [field]: value };
+      
+      // Auto-synchronize period amounts
+      if (field === 'preferredPeriod') {
+        cur.monthlyAmount = value === 'Monthly' ? cur.amount : 0;
+        cur.quarterlyAmount = value === 'Quarterly' ? cur.amount : 0;
+        cur.halfYearlyAmount = value === 'Half Yearly' ? cur.amount : 0;
+        cur.annuallyAmount = value === 'Annually' ? cur.amount : 0;
+      } else if (field === 'amount') {
+        const val = Number(value) || 0;
+        if (cur.preferredPeriod === 'Monthly') cur.monthlyAmount = val;
+        if (cur.preferredPeriod === 'Quarterly') cur.quarterlyAmount = val;
+        if (cur.preferredPeriod === 'Half Yearly') cur.halfYearlyAmount = val;
+        if (cur.preferredPeriod === 'Annually') cur.annuallyAmount = val;
+      }
+      
+      updated[activeEntryIndex] = cur;
+      return updated;
+    });
+  };
 
-      // Celebration confetti
+  // User Confirms Data -> Enters Records Directly into Active Sheet
+  const handleConfirmAndEnter = async () => {
+    if (entries.length === 0) return;
+
+    try {
+      // Switch active tab if user chose a different sheet
+      if (targetSheetId && targetSheetId !== activeSheetTabId) {
+        setActiveSheetTabId(targetSheetId);
+      }
+
+      let startSeq = 1;
+      try {
+        const nextStr = generateNextReceiptNumber();
+        const parsed = parseInt(nextStr.replace(/\D/g, ''), 10);
+        if (!isNaN(parsed)) startSeq = parsed;
+      } catch (e) {
+        // default 1
+      }
+
+      // Insert all verified entries
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const assignedReceiptNo = entry.receiptNo && entry.receiptNo.trim() !== '' 
+          ? entry.receiptNo 
+          : String(startSeq + i);
+
+        // Add to FinanceContext (Neon DB & template state)
+        await addTransaction({
+          receiptNo: assignedReceiptNo,
+          date: entry.date,
+          donorName: entry.donorName,
+          donorNameUrdu: entry.donorNameUrdu || undefined,
+          phone: entry.phone,
+          address: entry.address,
+          city: entry.city,
+          preferredPeriod: entry.preferredPeriod,
+          monthlyAmount: entry.monthlyAmount,
+          quarterlyAmount: entry.quarterlyAmount,
+          halfYearlyAmount: entry.halfYearlyAmount,
+          annuallyAmount: entry.annuallyAmount,
+          amount: Number(entry.amount) || 0,
+          categoryId: entry.categoryId,
+          paymentMode: entry.paymentMode,
+          bankName: entry.bankName,
+          chequeOrTxnNo: `AI-${Date.now().toString().slice(-4)}-${i + 1}`,
+          type: 'income',
+          status: 'verified',
+          notes: entry.notes,
+        });
+
+        // Also update rawGridData in localStorage for the sheet tab so raw grid view stays synced
+        try {
+          const gridKey = `jamia_raw_grid_${targetSheetId}`;
+          const currentRaw = JSON.parse(localStorage.getItem(gridKey) || '{}');
+          const existingRows = Object.keys(currentRaw).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
+          const nextRow = existingRows.length > 0 ? Math.max(...existingRows) + 1 : 1;
+          
+          currentRaw[nextRow] = {
+            'A': assignedReceiptNo,
+            'B': entry.date,
+            'C': entry.donorName,
+            'D': entry.address,
+            'E': entry.city,
+            'F': entry.monthlyAmount ? String(entry.monthlyAmount) : '',
+            'G': entry.quarterlyAmount ? String(entry.quarterlyAmount) : '',
+            'H': entry.halfYearlyAmount ? String(entry.halfYearlyAmount) : '',
+            'I': entry.annuallyAmount ? String(entry.annuallyAmount) : '',
+            'J': String(entry.amount),
+            'K': entry.paymentMode,
+            'L': entry.bankName,
+            'M': entry.phone,
+            'N': entry.categoryId,
+            'O': entry.notes,
+          };
+          localStorage.setItem(gridKey, JSON.stringify(currentRaw));
+        } catch (e) {
+          // ignore localStorage sync error
+        }
+      }
+
+      // Confetti celebration
       try {
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 100,
+          spread: 80,
           origin: { y: 0.6 }
         });
       } catch (e) {
@@ -279,25 +440,33 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
       setTimeout(() => {
         if (onSuccess) onSuccess();
         onClose();
-      }, 1400);
+      }, 1500);
     } catch (err: any) {
-      alert('Error entering transaction: ' + (err.message || 'Unknown error'));
+      alert('Error entering transactions: ' + (err.message || 'Unknown error'));
     }
   };
 
   const resetAll = () => {
     setStep('upload');
-    setImagePreview(null);
+    setFilePreview(null);
+    setFileName('');
+    setFileSizeStr('');
+    setIsPdf(false);
     setErrorMessage(null);
     setAiSummary('');
+    setEntries([]);
+    setActiveEntryIndex(0);
   };
+
+  const currentEntry = entries[activeEntryIndex] || entries[0];
+  const totalAmountSum = entries.reduce((acc, cur) => acc + (Number(cur.amount) || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[94vh] overflow-hidden">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-900 text-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-emerald-900 via-emerald-950 to-slate-900 text-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-200 text-emerald-950 flex items-center justify-center font-black shadow-md">
               <Sparkles className="w-5 h-5 animate-pulse" />
@@ -305,14 +474,14 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-                  Gemini AI Receipt Scanner
+                  Gemini AI Document &amp; Receipt Pipeline
                 </h3>
                 <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-emerald-950 uppercase tracking-wider">
-                  Vision Pipeline
+                  Multimodal AI
                 </span>
               </div>
               <p className="text-xs text-emerald-200/90 font-medium">
-                Upload any receipt picture &bull; AI checks details &bull; Confirm &amp; enter into sheet
+                Upload PDF documents or images &bull; Gemini analyzes contents &bull; Confirm &amp; enter into sheet
               </p>
             </div>
           </div>
@@ -326,10 +495,10 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5">
 
           {/* ==============================================================
-              STEP 1: UPLOAD PICTURE
+              STEP 1: UPLOAD DOCUMENT OR PICTURE
               ============================================================== */}
           {step === 'upload' && (
             <div className="space-y-5">
@@ -342,25 +511,33 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                 className="group border-2 border-dashed border-emerald-400/60 hover:border-emerald-500 rounded-2xl p-8 sm:p-12 text-center cursor-pointer bg-emerald-50/40 hover:bg-emerald-50/80 dark:bg-slate-800/40 dark:hover:bg-slate-800/70 transition-all flex flex-col items-center justify-center"
               >
                 <div className="w-16 h-16 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform mb-4">
-                  <Camera className="w-8 h-8" />
+                  <Upload className="w-8 h-8" />
                 </div>
 
                 <h4 className="text-base sm:text-lg font-black text-slate-800 dark:text-slate-100">
-                  Upload Receipt, Voucher, or Slip Picture
+                  Upload Financial Document, PDF, Voucher, or Receipt
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mt-1">
-                  Drag &amp; drop your image here, or browse files. Supports donation receipts (چندہ پرچی), hand-written vouchers, bank slips, and checks.
+                  Drag &amp; drop your file here, or click to browse. Supports PDF documents, scanned pages, donation receipts (چندہ پرچی), vouchers, and bank slips.
                 </p>
 
-                <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all">
-                  <Upload className="w-4 h-4" />
-                  <span>Choose Picture from Device</span>
+                <div className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all">
+                  <FileText className="w-4 h-4" />
+                  <span>Select Document (PDF / Images)</span>
+                </div>
+
+                <div className="mt-3 text-[11px] text-slate-400 flex items-center gap-3">
+                  <span>PDF Document</span>
+                  <span>•</span>
+                  <span>PNG / JPG / WEBP</span>
+                  <span>•</span>
+                  <span>Up to 20MB</span>
                 </div>
 
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -377,20 +554,29 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
               <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50 dark:bg-slate-800/50">
                 <div className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Quick Test with Generated Sample Slips:</span>
+                  <span>Quick Test with Instant Sample Documents:</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleLoadSample('pdf_multi')}
+                    className="px-3 py-1.5 rounded-lg border border-purple-300 bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-slate-700 text-purple-800 dark:text-purple-300 font-bold text-xs shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Test Sample 1: PDF Document (Multi-Donation Register)</span>
+                  </button>
                   <button
                     onClick={() => handleLoadSample('zakat')}
                     className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-emerald-800 dark:text-emerald-300 font-bold text-xs shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>Sample 1: Zakat Monthly Slip (Rs. 25,000)</span>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Test Sample 2: Zakat Receipt Slip (Rs. 25,000)</span>
                   </button>
                   <button
                     onClick={() => handleLoadSample('sadaqat')}
                     className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-800 dark:text-amber-300 font-bold text-xs shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>Sample 2: Annual Welfare Donation (Rs. 100,000)</span>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Test Sample 3: Annual Welfare Voucher (Rs. 100,000)</span>
                   </button>
                 </div>
               </div>
@@ -406,22 +592,32 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
               <div className="relative w-24 h-24 mx-auto">
                 <div className="absolute inset-0 rounded-3xl bg-emerald-500/20 animate-ping" />
                 <div className="relative w-24 h-24 rounded-3xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-amber-400 text-white flex items-center justify-center shadow-xl">
-                  <Sparkles className="w-12 h-12 animate-spin" />
+                  {isPdf ? <FileText className="w-12 h-12 animate-pulse" /> : <Sparkles className="w-12 h-12 animate-spin" />}
                 </div>
               </div>
 
               <div>
                 <h4 className="text-lg font-black text-slate-800 dark:text-slate-100">
-                  Gemini AI is Analyzing Picture...
+                  Gemini AI is Checking Document: {fileName || 'Uploaded Document'}
                 </h4>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-                  Extracting receipt number, donor name, address, city, preferred period, and Shariah fund classification.
+                  Parsing {isPdf ? 'PDF document layout' : 'image pixels'}, extracting receipt number, donor names, addresses, cities, periods, and amounts into the 15-column format.
                 </p>
               </div>
 
-              {imagePreview && (
-                <div className="max-w-xs mx-auto rounded-xl overflow-hidden border-2 border-emerald-400 shadow-md">
-                  <img src={imagePreview} alt="Receipt Preview" className="w-full h-36 object-cover opacity-80" />
+              {filePreview && (
+                <div className="max-w-xs mx-auto rounded-xl overflow-hidden border-2 border-emerald-400 shadow-md p-2 bg-slate-50 dark:bg-slate-800">
+                  {isPdf ? (
+                    <div className="p-4 flex items-center gap-3 text-left">
+                      <FileText className="w-8 h-8 text-rose-500 shrink-0" />
+                      <div className="overflow-hidden">
+                        <div className="font-bold text-xs truncate text-slate-800 dark:text-slate-200">{fileName}</div>
+                        <div className="text-[11px] text-slate-400">{fileSizeStr} &bull; PDF Document</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={filePreview} alt="Receipt Preview" className="w-full h-36 object-cover rounded-lg opacity-85" />
+                  )}
                 </div>
               )}
             </div>
@@ -430,65 +626,142 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
           {/* ==============================================================
               STEP 3: ASK USER TO CONFIRM DATA ("CONFIRMATION STEP")
               ============================================================== */}
-          {step === 'confirm' && (
+          {step === 'confirm' && currentEntry && (
             <div className="space-y-4">
               
               {/* AI Recognition Notification Banner */}
-              <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200 dark:border-emerald-800 text-xs flex items-start gap-3">
-                <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-extrabold text-emerald-900 dark:text-emerald-200">
-                    Data Extracted from Picture — Please Confirm:
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200 dark:border-emerald-800 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                    <Sparkles className="w-4 h-4" />
                   </div>
-                  <div className="text-emerald-700 dark:text-emerald-300/90 text-[11px] mt-0.5 leading-relaxed">
-                    {aiSummary || 'Please verify the extracted transaction fields below before entering into the spreadsheet.'}
+                  <div>
+                    <div className="font-extrabold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                      <span>Document Inspected by Gemini AI — Please Confirm</span>
+                      {entries.length > 1 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-700 text-white">
+                          {entries.length} Records Found
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-emerald-700 dark:text-emerald-300/90 text-[11px] mt-0.5">
+                      {aiSummary}
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={resetAll}
-                  className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
-                >
-                  Upload Another
-                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={resetAll}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Scan Another</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Two-Column Review Layout: Left (Image) & Right (Form) */}
+              {/* Multi-Record Tabs if document contains multiple entries */}
+              {entries.length > 1 && (
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5" /> Records:
+                    </span>
+                    {entries.map((entry, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveEntryIndex(idx)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          activeEntryIndex === idx
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                        }`}
+                      >
+                        #{idx + 1}: {entry.donorName.slice(0, 15)} ({orgConfig.currencySymbol} {entry.amount.toLocaleString()})
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="text-xs font-black text-emerald-700 dark:text-emerald-300 shrink-0 ml-2">
+                    Total: {orgConfig.currencySymbol} {totalAmountSum.toLocaleString()}
+                  </div>
+                </div>
+              )}
+
+              {/* Two-Column Review Layout: Left (Document View) & Right (Editable Form) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                 
-                {/* Left: Original Receipt Image Preview */}
-                <div className="lg:col-span-4 flex flex-col space-y-2">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Uploaded Picture</span>
+                {/* Left: Original Document / Picture Preview */}
+                <div className="lg:col-span-5 flex flex-col space-y-2">
+                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      {isPdf ? <FileText className="w-3.5 h-3.5 text-rose-500" /> : <ImageIcon className="w-3.5 h-3.5 text-slate-400" />}
+                      <span>{isPdf ? 'Uploaded PDF Document' : 'Uploaded Image'}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">{fileName} ({fileSizeStr})</span>
                   </div>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 flex-1 flex items-center justify-center p-2 min-h-[220px]">
-                    {imagePreview ? (
+
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 flex-1 flex flex-col items-center justify-center p-2 min-h-[260px] max-h-[540px]">
+                    {isPdf && filePreview ? (
+                      <div className="w-full h-full flex flex-col">
+                        <iframe 
+                          src={filePreview} 
+                          title="PDF Preview"
+                          className="w-full h-[460px] rounded-lg border border-slate-200 dark:border-slate-800 bg-white" 
+                        />
+                        <div className="mt-2 text-center">
+                          <a 
+                            href={filePreview} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1"
+                          >
+                            <span>Open PDF in new window</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    ) : filePreview ? (
                       <img 
-                        src={imagePreview} 
+                        src={filePreview} 
                         alt="Scanned Receipt" 
-                        className="max-h-72 w-full object-contain rounded-lg shadow-xs" 
+                        className="max-h-[500px] w-full object-contain rounded-lg shadow-xs" 
                       />
                     ) : (
-                      <div className="text-xs text-slate-400">No image preview</div>
+                      <div className="text-xs text-slate-400">No document preview available</div>
                     )}
                   </div>
                 </div>
 
                 {/* Right: Confirmation Form Fields */}
-                <div className="lg:col-span-8 space-y-3">
+                <div className="lg:col-span-7 space-y-3">
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Extracted Fields (Editable)</span>
+                      <span>
+                        {entries.length > 1 ? `Edit Record ${activeEntryIndex + 1} of ${entries.length}` : 'Extracted Fields (Editable)'}
+                      </span>
                     </span>
-                    <span className="text-[11px] text-emerald-600 font-semibold">
-                      Target: Sheet ({activeSheetTabId || 'sheet1'})
-                    </span>
+
+                    {/* Destination Sheet Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-slate-400 font-medium">Destination:</span>
+                      <select
+                        value={targetSheetId}
+                        onChange={(e) => setTargetSheetId(e.target.value)}
+                        className="px-2 py-0.5 rounded-lg border border-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-bold text-[11px] cursor-pointer"
+                      >
+                        {sheetTabs.map(tab => (
+                          <option key={tab.id} value={tab.id}>
+                            {tab.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
                     
                     {/* Receipt No */}
                     <div>
@@ -497,10 +770,10 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.receiptNo}
-                        onChange={(e) => setFormData({ ...formData, receiptNo: e.target.value })}
+                        value={currentEntry.receiptNo}
+                        onChange={(e) => updateCurrentEntry('receiptNo', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        placeholder="e.g. 1"
+                        placeholder="Auto (e.g. 1)"
                       />
                     </div>
 
@@ -511,8 +784,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        value={currentEntry.date}
+                        onChange={(e) => updateCurrentEntry('date', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
@@ -524,8 +797,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.donorName}
-                        onChange={(e) => setFormData({ ...formData, donorName: e.target.value })}
+                        value={currentEntry.donorName}
+                        onChange={(e) => updateCurrentEntry('donorName', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="Contributor name in English / Urdu"
                       />
@@ -538,8 +811,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        value={currentEntry.address}
+                        onChange={(e) => updateCurrentEntry('address', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="Street or Area"
                       />
@@ -553,8 +826,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       <input
                         type="text"
                         list="modal-pakistan-cities"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        value={currentEntry.city}
+                        onChange={(e) => updateCurrentEntry('city', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="e.g. Karachi, Lahore..."
                       />
@@ -579,18 +852,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                         Preferred Period (مدت / میعاد)
                       </label>
                       <select
-                        value={formData.preferredPeriod}
-                        onChange={(e) => {
-                          const p = e.target.value as any;
-                          setFormData({
-                            ...formData,
-                            preferredPeriod: p,
-                            monthlyAmount: p === 'Monthly' ? formData.amount : 0,
-                            quarterlyAmount: p === 'Quarterly' ? formData.amount : 0,
-                            halfYearlyAmount: p === 'Half Yearly' ? formData.amount : 0,
-                            annuallyAmount: p === 'Annually' ? formData.amount : 0,
-                          });
-                        }}
+                        value={currentEntry.preferredPeriod}
+                        onChange={(e) => updateCurrentEntry('preferredPeriod', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                       >
                         <option value="Monthly">Monthly (ماہانہ)</option>
@@ -607,18 +870,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="number"
-                        value={formData.amount}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          setFormData({
-                            ...formData,
-                            amount: val,
-                            monthlyAmount: formData.preferredPeriod === 'Monthly' ? val : formData.monthlyAmount,
-                            quarterlyAmount: formData.preferredPeriod === 'Quarterly' ? val : formData.quarterlyAmount,
-                            halfYearlyAmount: formData.preferredPeriod === 'Half Yearly' ? val : formData.halfYearlyAmount,
-                            annuallyAmount: formData.preferredPeriod === 'Annually' ? val : formData.annuallyAmount,
-                          });
-                        }}
+                        value={currentEntry.amount}
+                        onChange={(e) => updateCurrentEntry('amount', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border-2 border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-mono font-black text-sm focus:outline-none"
                         placeholder="0"
                       />
@@ -630,8 +883,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                         Cheque or CASH (ذریعہ ادائیگی)
                       </label>
                       <select
-                        value={formData.paymentMode}
-                        onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value as any })}
+                        value={currentEntry.paymentMode}
+                        onChange={(e) => updateCurrentEntry('paymentMode', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                       >
                         <option value="Cash">Cash</option>
@@ -648,8 +901,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.bankName}
-                        onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                        value={currentEntry.bankName}
+                        onChange={(e) => updateCurrentEntry('bankName', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="e.g. Meezan Bank, ABL, HBL"
                       />
@@ -662,8 +915,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        value={currentEntry.phone}
+                        onChange={(e) => updateCurrentEntry('phone', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="0300-1234567"
                       />
@@ -675,8 +928,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                         Fund Category (مد / کھاتہ)
                       </label>
                       <select
-                        value={formData.categoryId}
-                        onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                        value={currentEntry.categoryId}
+                        onChange={(e) => updateCurrentEntry('categoryId', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                       >
                         {categories.map((c) => (
@@ -694,8 +947,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        value={currentEntry.notes}
+                        onChange={(e) => updateCurrentEntry('notes', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="Purpose of donation or remarks"
                       />
@@ -718,10 +971,14 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h4 className="text-xl font-black text-slate-800 dark:text-slate-100">
-                Transaction Entered Successfully!
+                {entries.length > 1 
+                  ? `${entries.length} Transactions Entered Successfully!` 
+                  : 'Transaction Entered Successfully!'}
               </h4>
               <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-                Receipt #{formData.receiptNo} ({orgConfig.currencySymbol} {formData.amount.toLocaleString()}) has been verified and added into your active working sheet.
+                {entries.length > 1
+                  ? `${entries.length} verified records (Total: ${orgConfig.currencySymbol} ${totalAmountSum.toLocaleString()}) entered into ${currentTargetSheet.name}.`
+                  : `Receipt #${currentEntry.receiptNo || 'auto'} (${orgConfig.currencySymbol} ${currentEntry.amount.toLocaleString()}) has been verified and entered into ${currentTargetSheet.name}.`}
               </p>
             </div>
           )}
@@ -729,7 +986,7 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+        <div className="flex items-center justify-between px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -743,7 +1000,7 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                 onClick={resetAll}
                 className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 cursor-pointer"
               >
-                Scan Different Picture
+                Upload Different File
               </button>
 
               <button
@@ -751,7 +1008,11 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                 className="px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
               >
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>Yes, Confirm &amp; Enter into Sheet</span>
+                <span>
+                  {entries.length > 1 
+                    ? `Yes, Confirm & Enter All (${entries.length}) into Sheet` 
+                    : 'Yes, Confirm & Enter into Sheet'}
+                </span>
               </button>
             </div>
           )}

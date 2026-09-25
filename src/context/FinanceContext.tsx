@@ -21,7 +21,7 @@ import { convertNumberToEnglishWords } from '../utils/englishNumberToWords';
 import { api, HealthResponse } from '../services/api';
 
 export const rawBlankSheetTabs: SheetTab[] = [
-  { id: 'sheet1', name: 'Sheet 1', nameUrdu: 'Sheet 1', typeFilter: 'all', color: '#0284c7', periodType: 'raw' },
+  { id: 'sheet1', name: 'Sheet 1', nameUrdu: 'Sheet 1', typeFilter: 'all', color: '#0284c7', periodType: 'template' },
 ];
 
 export const jamiaTemplateTabs: SheetTab[] = [
