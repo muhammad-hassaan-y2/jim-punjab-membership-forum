@@ -27,9 +27,39 @@ import {
   Pencil,
   Hash,
   Sparkles,
-  Camera
+  Camera,
+  FolderPlus,
+  MapPin,
+  Building,
+  Briefcase,
+  Database,
+  Save,
+  Layers,
+  Users,
+  Target,
+  TrendingUp,
+  AlertCircle,
+  DollarSign,
+  CheckCircle2
 } from 'lucide-react';
-import { Transaction, SheetTab } from '../types/finance';
+import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey } from '../types/finance';
+
+export type AccountingColKey = 
+  | 'receiptNo' 
+  | 'date' 
+  | 'donorName' 
+  | 'branchName' 
+  | 'zila' 
+  | 'phone' 
+  | 'monthlyAmount' 
+  | 'quarterlyAmount' 
+  | 'annuallyAmount' 
+  | 'jan' | 'feb' | 'mar' | 'apr' | 'may' | 'jun' | 'jul' | 'aug' | 'sep' | 'oct' | 'nov' | 'dec' 
+  | 'amount' 
+  | 'balance' 
+  | 'paymentMode' 
+  | 'bankName' 
+  | 'notes';
 import { GeminiReceiptScannerModal } from './GeminiReceiptScannerModal';
 import { 
   exportTransactionsToExcel, 
@@ -39,6 +69,14 @@ import {
   exportRawGridToExcel,
   printRawGridAsPDF
 } from '../utils/exportUtils';
+
+const PUNJAB_CITIES_PRESET = [
+  'Lahore', 'Faisalabad', 'Rawalpindi', 'Gujranwala', 'Multan',
+  'Bahawalpur', 'Sargodha', 'Sialkot', 'Sheikhupura', 'Rahim Yar Khan',
+  'Jhang', 'Dera Ghazi Khan', 'Gujrat', 'Sahiwal', 'Wah Cantt',
+  'Kasur', 'Okara', 'Mianwali', 'Chiniot', 'Kamoke',
+  'Hafizabad', 'Sadiqabad', 'Burewala', 'Khanewal', 'Muzaffargarh'
+];
 
 export interface FinancialSheetsProps {
   isStandaloneShareView?: boolean;
@@ -53,16 +91,26 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     sheetTabs,
     activeSheetTabId,
     setActiveSheetTabId,
+    projects,
+    setProjects,
+    activeProjectId,
+    setActiveProjectId,
+    createProject,
     activeTemplate,
     loadTemplate,
     createRawBlankSheet,
     createTemplateSheet,
     addSheetTab,
     deleteSheetTab,
+    batchCreateAndSaveSheets,
+    saveAllSheetsToDatabase,
+    dbStatus,
+    dbLatency,
     setActiveTab, 
     setActiveReceiptTransaction, 
     addBlankRow,
     updateCell,
+    updateTransaction,
     deleteTransaction, 
     duplicateTransaction,
     clearAllTransactions,
@@ -273,19 +321,24 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // TEMPLATE MODE STATE (9-COLUMN LEDGER)
   // ==========================================
   // Active Selected Cell for Template Navigation
-  const [selectedCell, setSelectedCell] = useState<{ rowId: string; rowIndex: number; colKey: keyof Transaction; colLetter: string } | null>(null);
-  const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: keyof Transaction } | null>(null);
+  // Active Selected Cell for Template Navigation
+  const [selectedCell, setSelectedCell] = useState<{ rowId: string; rowIndex: number; colKey: AccountingColKey; colLetter: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: AccountingColKey } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
   const [formulaBarValue, setFormulaBarValue] = useState<string>('');
 
   // Template gallery bar toggle
   const [showTemplateBar, setShowTemplateBar] = useState(false);
 
-  // Filters State
+  // Accounting Slicers & Filters State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedZila, setSelectedZila] = useState<string>('all');
+  const [selectedBranch, setSelectedBranch] = useState<string>('all');
+  const [selectedAccountingStatus, setSelectedAccountingStatus] = useState<'all' | 'paid' | 'due' | 'unpaid'>('all');
   const [selectedPaymentMode, setSelectedPaymentMode] = useState<string>('all');
+  const [focusedMonth, setFocusedMonth] = useState<MonthKey | null>(null);
+  const [monthViewMode, setMonthViewMode] = useState<'all' | 'compact'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'receiptNo'>('receiptNo');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -297,58 +350,123 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // New Sheet Tab Modal
   const [isNewSheetModalOpen, setIsNewSheetModalOpen] = useState(false);
   const [newSheetName, setNewSheetName] = useState('');
+  const [newSheetCity, setNewSheetCity] = useState('');
   const [newSheetCategory, setNewSheetCategory] = useState('');
+  const [newSheetFormat, setNewSheetFormat] = useState<'template' | 'raw'>('template');
+
+  // New Project & Year Modal
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectYear, setNewProjectYear] = useState<string>('2026');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  // Batch Multi-Sheet Creator Modal (Select count & save directly to database)
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [batchCount, setBatchCount] = useState<number>(5);
+  const [batchFormat, setBatchFormat] = useState<'template' | 'raw'>('template');
+  const [batchAutoCities, setBatchAutoCities] = useState<boolean>(true);
+  const [batchCustomCities, setBatchCustomCities] = useState<string>('');
+  const [isSavingToDb, setIsSavingToDb] = useState(false);
+  const [dbSaveSuccessMsg, setDbSaveSuccessMsg] = useState<string | null>(null);
+
   // Gemini AI Receipt Scanner Modal
   const [isGeminiScannerOpen, setIsGeminiScannerOpen] = useState(false);
 
   // File import ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Column definitions matching exact specified format
-  const columns: { letter: string; key: keyof Transaction; titleEn: string; width: string; align?: 'left' | 'center' | 'right' }[] = [
-    { letter: 'A', key: 'receiptNo', titleEn: 'Receipt No', width: 'w-28' },
-    { letter: 'B', key: 'date', titleEn: 'Date', width: 'w-28', align: 'center' },
-    { letter: 'C', key: 'donorName', titleEn: 'Received From', width: 'w-48' },
-    { letter: 'D', key: 'address', titleEn: 'Address', width: 'w-44' },
-    { letter: 'E', key: 'city', titleEn: 'City', width: 'w-32' },
-    { letter: 'F', key: 'monthlyAmount', titleEn: 'Monthly', width: 'w-28', align: 'right' },
-    { letter: 'G', key: 'quarterlyAmount', titleEn: 'Quarterly', width: 'w-28', align: 'right' },
-    { letter: 'H', key: 'halfYearlyAmount', titleEn: 'Half Yearly', width: 'w-28', align: 'right' },
-    { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', width: 'w-28', align: 'right' },
-    { letter: 'J', key: 'amount', titleEn: 'Total Amount as Period', width: 'w-40', align: 'right' },
-    { letter: 'K', key: 'paymentMode', titleEn: 'Cheque or CASH', width: 'w-32', align: 'center' },
-    { letter: 'L', key: 'bankName', titleEn: 'Bank Name', width: 'w-36' },
-    { letter: 'M', key: 'phone', titleEn: 'Mobile Number', width: 'w-32' },
-    { letter: 'N', key: 'categoryId', titleEn: 'Fund Category', width: 'w-36' },
-    { letter: 'O', key: 'notes', titleEn: 'Notes / Remarks', width: 'w-44' },
+  // 26 Complete Accounting Columns (A-Z) matching exact requested format
+  const columns: { letter: string; key: AccountingColKey; titleEn: string; titleUr: string; width: string; align?: 'left' | 'center' | 'right' }[] = [
+    { letter: 'A', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24' },
+    { letter: 'B', key: 'date', titleEn: 'Date', titleUr: 'تاریخ', width: 'w-24', align: 'center' },
+    { letter: 'C', key: 'donorName', titleEn: 'Donor Name', titleUr: 'نام دہندہ', width: 'w-48' },
+    { letter: 'D', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
+    { letter: 'E', key: 'zila', titleEn: 'Zila', titleUr: 'ضلع', width: 'w-28' },
+    { letter: 'F', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
+    { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
+    { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
+    { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
+    { letter: 'J', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
+    { letter: 'K', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
+    { letter: 'L', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
+    { letter: 'M', key: 'apr', titleEn: 'Apr', titleUr: 'اپریل', width: 'w-20', align: 'right' },
+    { letter: 'N', key: 'may', titleEn: 'May', titleUr: 'مئی', width: 'w-20', align: 'right' },
+    { letter: 'O', key: 'jun', titleEn: 'Jun', titleUr: 'جون', width: 'w-20', align: 'right' },
+    { letter: 'P', key: 'jul', titleEn: 'Jul', titleUr: 'جولائی', width: 'w-20', align: 'right' },
+    { letter: 'Q', key: 'aug', titleEn: 'Aug', titleUr: 'اگست', width: 'w-20', align: 'right' },
+    { letter: 'R', key: 'sep', titleEn: 'Sep', titleUr: 'ستمبر', width: 'w-20', align: 'right' },
+    { letter: 'S', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
+    { letter: 'T', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
+    { letter: 'U', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
+    { letter: 'V', key: 'amount', titleEn: 'Total Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
+    { letter: 'W', key: 'balance', titleEn: 'Balance Due', titleUr: 'واجب الادا', width: 'w-28', align: 'right' },
+    { letter: 'X', key: 'paymentMode', titleEn: 'Payment Mode', titleUr: 'طریقہ', width: 'w-28', align: 'center' },
+    { letter: 'Y', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
+    { letter: 'Z', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
   ];
 
-  // Filtered & Sorted Transactions
+  // Helper to extract or compute cell values
+  const getCellValue = (tx: Transaction, colKey: AccountingColKey): any => {
+    if (MONTH_KEYS.includes(colKey as any)) {
+      return tx.monthsData?.[colKey as MonthKey] || 0;
+    }
+    if (colKey === 'balance') {
+      const tgt = (tx.annuallyAmount && tx.annuallyAmount > 0)
+        ? tx.annuallyAmount
+        : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
+            ? tx.quarterlyAmount * 4
+            : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount));
+      const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
+        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+        : Number(tx.amount || 0);
+      return Math.max(0, (tgt || 0) - paid);
+    }
+    return (tx as any)[colKey];
+  };
+
+  // Filtered & Sorted Transactions with Accounting Slicers
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       // Sheet tab filter
       if (currentSheetTab) {
-        if (currentSheetTab.categoryFilter && t.categoryId !== currentSheetTab.categoryFilter) return false;
         if (currentSheetTab.typeFilter && currentSheetTab.typeFilter !== 'all' && t.type !== currentSheetTab.typeFilter) return false;
       }
 
-      // Filter Toolbar
+      // Slicers: Type, Zila, Branch, Payment Mode, Status
       if (selectedType !== 'all' && t.type !== selectedType) return false;
-      if (selectedCategory !== 'all' && t.categoryId !== selectedCategory) return false;
+      if (selectedZila !== 'all' && (t.zila || t.city || '').toLowerCase() !== selectedZila.toLowerCase()) return false;
+      if (selectedBranch !== 'all' && (t.branchName || '').toLowerCase() !== selectedBranch.toLowerCase()) return false;
       if (selectedPaymentMode !== 'all' && t.paymentMode !== selectedPaymentMode) return false;
 
-      // Search Query
+      // Status filter: Paid, Due/Arrears, Unpaid
+      if (selectedAccountingStatus !== 'all') {
+        const target = (t.annuallyAmount && t.annuallyAmount > 0)
+          ? t.annuallyAmount
+          : ((t.quarterlyAmount && t.quarterlyAmount > 0)
+              ? t.quarterlyAmount * 4
+              : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount));
+        const months = t.monthsData || {};
+        const paid = Object.values(months).length > 0
+          ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+          : Number(t.amount || 0);
+
+        if (selectedAccountingStatus === 'paid' && (paid < target || target === 0)) return false;
+        if (selectedAccountingStatus === 'due' && (paid >= target || paid === 0)) return false;
+        if (selectedAccountingStatus === 'unpaid' && paid > 0) return false;
+      }
+
+      // Multi-Field Search Query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesReceipt = (t.receiptNo || '').toLowerCase().includes(query);
         const matchesName = (t.donorName || '').toLowerCase().includes(query);
         const matchesNameUrdu = (t.donorNameUrdu || '').includes(query);
-        const matchesAddress = (t.address || '').toLowerCase().includes(query);
-        const matchesCity = (t.city || '').toLowerCase().includes(query);
+        const matchesBranch = (t.branchName || '').toLowerCase().includes(query);
+        const matchesZila = (t.zila || t.city || '').toLowerCase().includes(query);
+        const matchesPhone = (t.phone || '').toLowerCase().includes(query);
         const matchesNotes = (t.notes || '').toLowerCase().includes(query);
         const matchesBank = (t.bankName || '').toLowerCase().includes(query);
 
-        if (!matchesReceipt && !matchesName && !matchesNameUrdu && !matchesAddress && !matchesCity && !matchesNotes && !matchesBank) {
+        if (!matchesReceipt && !matchesName && !matchesNameUrdu && !matchesBranch && !matchesZila && !matchesPhone && !matchesNotes && !matchesBank) {
           return false;
         }
       }
@@ -368,7 +486,26 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       }
       return sortOrder === 'asc' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [transactions, currentSheetTab, selectedType, selectedCategory, selectedPaymentMode, searchQuery, sortBy, sortOrder]);
+  }, [transactions, currentSheetTab, selectedType, selectedZila, selectedBranch, selectedAccountingStatus, selectedPaymentMode, searchQuery, sortBy, sortOrder]);
+
+  // Dynamic Punjab Zila & Branch collections for slicers
+  const availableZilas = useMemo(() => {
+    const set = new Set<string>();
+    PUNJAB_CITIES_PRESET.forEach(c => set.add(c));
+    transactions.forEach(t => {
+      if (t.zila && t.zila.trim()) set.add(t.zila.trim());
+      if (t.city && t.city.trim()) set.add(t.city.trim());
+    });
+    return Array.from(set).sort();
+  }, [transactions]);
+
+  const availableBranches = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach(t => {
+      if (t.branchName && t.branchName.trim()) set.add(t.branchName.trim());
+    });
+    return Array.from(set).sort();
+  }, [transactions]);
 
   // Derived pagination for Template Mode
   const totalTemplateRows = filteredTransactions.length;
@@ -391,78 +528,278 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     ? rawRowCount 
     : Math.min(parseInt(rawDisplayLimit, 10), rawRowCount);
 
-  // Google Sheets Quick Summary Statistics
+  // Accounting Summary Performance Statistics (Pledged Target, Realized Collection, Outstanding Arrears, Monthly Totals)
   const summaryStats = useMemo(() => {
-    const amounts = filteredTransactions.filter(t => t.type === 'income' && t.status !== 'cancelled').map(t => Number(t.amount || 0));
-    const sum = amounts.reduce((a, b) => a + b, 0);
-    const count = amounts.length;
-    const avg = count > 0 ? sum / count : 0;
-    const min = count > 0 ? Math.min(...amounts) : 0;
-    const max = count > 0 ? Math.max(...amounts) : 0;
+    let totalPledged = 0;
+    let totalPaid = 0;
+    let cashTotal = 0;
+    let bankTotal = 0;
+    let monthlyCommitmentsSum = 0;
+    let quarterlyCommitmentsSum = 0;
+    let annuallyCommitmentsSum = 0;
 
-    const expenseAmounts = filteredTransactions.filter(t => t.type === 'expense' && t.status !== 'cancelled').map(t => Number(t.amount || 0));
-    const totalExp = expenseAmounts.reduce((a, b) => a + b, 0);
+    const monthSums: Record<MonthKey, number> = {
+      jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+      jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
+    };
+
+    filteredTransactions.forEach(t => {
+      monthlyCommitmentsSum += Number(t.monthlyAmount || 0);
+      quarterlyCommitmentsSum += Number(t.quarterlyAmount || 0);
+      annuallyCommitmentsSum += Number(t.annuallyAmount || 0);
+
+      const target = (t.annuallyAmount && t.annuallyAmount > 0)
+        ? t.annuallyAmount
+        : ((t.quarterlyAmount && t.quarterlyAmount > 0)
+            ? t.quarterlyAmount * 4
+            : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount));
+      totalPledged += Number(target || 0);
+
+      const months = t.monthsData || {};
+      let rowPaid = 0;
+      if (Object.values(months).length > 0) {
+        MONTH_KEYS.forEach(m => {
+          const v = Number(months[m]) || 0;
+          monthSums[m] += v;
+          rowPaid += v;
+        });
+      } else {
+        rowPaid = Number(t.amount || 0);
+      }
+      totalPaid += rowPaid;
+
+      if (t.paymentMode === 'Cash') {
+        cashTotal += rowPaid;
+      } else {
+        bankTotal += rowPaid;
+      }
+    });
+
+    const totalBalance = Math.max(0, totalPledged - totalPaid);
+    const collectionRate = totalPledged > 0 
+      ? Math.min(100, Math.round((totalPaid / totalPledged) * 100)) 
+      : (totalPaid > 0 ? 100 : 0);
 
     return {
-      sum,
-      totalExp,
-      net: sum - totalExp,
-      avg,
-      min,
-      max,
+      totalDonors: filteredTransactions.length,
+      totalPledged,
+      totalPaid,
+      totalBalance,
+      collectionRate,
+      cashTotal,
+      bankTotal,
+      monthlyCommitmentsSum,
+      quarterlyCommitmentsSum,
+      annuallyCommitmentsSum,
+      monthSums,
       count: filteredTransactions.length,
+      sum: totalPaid,
+      totalExp: 0,
+      avg: filteredTransactions.length > 0 ? totalPaid / filteredTransactions.length : 0,
+      net: totalPaid,
     };
   }, [filteredTransactions]);
 
   // Handle cell click selection
-  const handleCellClick = (rowId: string, rowIndex: number, colKey: keyof Transaction, colLetter: string) => {
+  const handleCellClick = (rowId: string, rowIndex: number, colKey: AccountingColKey, colLetter: string) => {
     const tx = transactions.find(t => t.id === rowId);
     if (!tx) return;
     setSelectedCell({ rowId, rowIndex, colKey, colLetter });
-    setFormulaBarValue(String(tx[colKey] !== undefined ? tx[colKey] : ''));
+    setFormulaBarValue(String(getCellValue(tx, colKey)));
   };
 
   // Handle cell double click for inline editing
-  const handleCellDoubleClick = (rowId: string, colKey: keyof Transaction) => {
+  const handleCellDoubleClick = (rowId: string, colKey: AccountingColKey) => {
+    if (colKey === 'balance' || colKey === 'amount') return; // Read-only calculated totals
     const tx = transactions.find(t => t.id === rowId);
     if (!tx) return;
     setEditingCell({ rowId, colKey });
-    setCellEditValue(String(tx[colKey] !== undefined ? tx[colKey] : ''));
+    setCellEditValue(String(getCellValue(tx, colKey)));
   };
 
   // Commit inline edit
-  const handleCommitEdit = (rowId: string, colKey: keyof Transaction, value: string) => {
+  const handleCommitEdit = (rowId: string, colKey: AccountingColKey, value: string) => {
+    if (MONTH_KEYS.includes(colKey as any)) {
+      const mKey = colKey as MonthKey;
+      const numVal = parseFloat(value) || 0;
+      const tx = transactions.find(t => t.id === rowId);
+      const currentMonths = tx?.monthsData || {};
+      const updatedMonths = { ...currentMonths, [mKey]: numVal };
+      const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+      updateTransaction(rowId, {
+        monthsData: updatedMonths,
+        amount: totalSum,
+      });
+      setEditingCell(null);
+      setFormulaBarValue(String(numVal));
+      return;
+    }
+
     let finalVal: any = value;
-    if (['amount', 'monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(colKey as string)) {
+    if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(colKey as string)) {
       finalVal = parseFloat(value) || 0;
     }
-    updateCell(rowId, colKey, finalVal);
-    if (colKey === 'monthlyAmount' && finalVal > 0) {
-      updateCell(rowId, 'preferredPeriod', 'Monthly');
-      updateCell(rowId, 'amount', finalVal);
-    } else if (colKey === 'quarterlyAmount' && finalVal > 0) {
-      updateCell(rowId, 'preferredPeriod', 'Quarterly');
-      updateCell(rowId, 'amount', finalVal);
-    } else if (colKey === 'halfYearlyAmount' && finalVal > 0) {
-      updateCell(rowId, 'preferredPeriod', 'Half Yearly');
-      updateCell(rowId, 'amount', finalVal);
-    } else if (colKey === 'annuallyAmount' && finalVal > 0) {
-      updateCell(rowId, 'preferredPeriod', 'Annually');
-      updateCell(rowId, 'amount', finalVal);
+
+    updateCell(rowId, colKey as keyof Transaction, finalVal);
+
+    if (colKey === 'monthlyAmount') {
+      const num = parseFloat(value) || 0;
+      const tx = transactions.find(t => t.id === rowId);
+      updateTransaction(rowId, {
+        monthlyAmount: num,
+        quarterlyAmount: tx?.quarterlyAmount || (num > 0 ? num * 3 : 0),
+        annuallyAmount: tx?.annuallyAmount || (num > 0 ? num * 12 : 0),
+        preferredPeriod: 'Monthly',
+      });
+    } else if (colKey === 'quarterlyAmount') {
+      const num = parseFloat(value) || 0;
+      const tx = transactions.find(t => t.id === rowId);
+      updateTransaction(rowId, {
+        quarterlyAmount: num,
+        monthlyAmount: tx?.monthlyAmount || (num > 0 ? Math.round(num / 3) : 0),
+        annuallyAmount: tx?.annuallyAmount || (num > 0 ? num * 4 : 0),
+        preferredPeriod: 'Quarterly',
+      });
+    } else if (colKey === 'annuallyAmount') {
+      const num = parseFloat(value) || 0;
+      const tx = transactions.find(t => t.id === rowId);
+      updateTransaction(rowId, {
+        annuallyAmount: num,
+        monthlyAmount: tx?.monthlyAmount || (num > 0 ? Math.round(num / 12) : 0),
+        quarterlyAmount: tx?.quarterlyAmount || (num > 0 ? Math.round(num / 4) : 0),
+        preferredPeriod: 'Annually',
+      });
     }
+
     setEditingCell(null);
     setFormulaBarValue(String(finalVal));
   };
 
-  // Google Sheets keyboard navigation (Enter moves down, Tab moves right) in Template Mode
+  // Quick-Pay action: Record donor's monthly pledge for active or current month
+  const handleQuickPayMonth = (tx: Transaction, monthKey?: MonthKey) => {
+    const curMonthIndex = new Date().getMonth();
+    const targetMonth: MonthKey = monthKey || (MONTH_KEYS[curMonthIndex] || 'jan');
+    const amt = tx.monthlyAmount && tx.monthlyAmount > 0 
+      ? tx.monthlyAmount 
+      : (tx.quarterlyAmount && tx.quarterlyAmount > 0 ? Math.round(tx.quarterlyAmount / 3) : 500);
+    const updatedMonths = { ...(tx.monthsData || {}), [targetMonth]: amt };
+    const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+    updateTransaction(tx.id, {
+      monthsData: updatedMonths,
+      amount: totalSum,
+    });
+  };
+
+  // Helper to scroll active cell into view smoothly like Excel
+  const scrollToCell = (elementId: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    }, 15);
+  };
+
+  // Auto-select first cell on load if none selected
+  useEffect(() => {
+    if (!isRawMode && !selectedCell && displayedTransactions.length > 0) {
+      const first = displayedTransactions[0];
+      setSelectedCell({
+        rowId: first.id,
+        rowIndex: 0,
+        colKey: 'receiptNo',
+        colLetter: 'A'
+      });
+      setFormulaBarValue(String(first.receiptNo || ''));
+    }
+  }, [isRawMode, displayedTransactions, selectedCell]);
+
+  // Excel keyboard navigation when INSIDE active cell input
   const handleTemplateCellKeyDown = (
     e: React.KeyboardEvent,
     rowId: string,
-    colKey: keyof Transaction,
+    colKey: AccountingColKey,
     currentIdx: number,
     value: string
   ) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitEdit(rowId, colKey, value);
+      if (e.shiftKey) {
+        if (currentIdx > 0) {
+          const prevTx = displayedTransactions[currentIdx - 1];
+          const colDef = columns.find(c => c.key === colKey);
+          setSelectedCell({
+            rowId: prevTx.id,
+            rowIndex: startIndex + currentIdx - 1,
+            colKey,
+            colLetter: colDef?.letter || 'A'
+          });
+          setFormulaBarValue(String(getCellValue(prevTx, colKey)));
+          scrollToCell(`cell-${prevTx.id}-${colKey}`);
+        }
+      } else {
+        if (currentIdx + 1 < displayedTransactions.length) {
+          const nextTx = displayedTransactions[currentIdx + 1];
+          const colDef = columns.find(c => c.key === colKey);
+          setSelectedCell({
+            rowId: nextTx.id,
+            rowIndex: startIndex + currentIdx + 1,
+            colKey,
+            colLetter: colDef?.letter || 'A'
+          });
+          setFormulaBarValue(String(getCellValue(nextTx, colKey)));
+          scrollToCell(`cell-${nextTx.id}-${colKey}`);
+        }
+      }
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      handleCommitEdit(rowId, colKey, value);
+      const colIdx = columns.findIndex(c => c.key === colKey);
+      if (e.shiftKey) {
+        if (colIdx > 0) {
+          const nextCol = columns[colIdx - 1];
+          const curTx = displayedTransactions[currentIdx];
+          setSelectedCell({
+            rowId: curTx.id,
+            rowIndex: startIndex + currentIdx,
+            colKey: nextCol.key,
+            colLetter: nextCol.letter
+          });
+          setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+          scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+        }
+      } else {
+        if (colIdx + 1 < columns.length) {
+          const nextCol = columns[colIdx + 1];
+          const curTx = displayedTransactions[currentIdx];
+          setSelectedCell({
+            rowId: curTx.id,
+            rowIndex: startIndex + currentIdx,
+            colKey: nextCol.key,
+            colLetter: nextCol.letter
+          });
+          setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+          scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+        }
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      handleCommitEdit(rowId, colKey, value);
+      if (currentIdx > 0) {
+        const prevTx = displayedTransactions[currentIdx - 1];
+        const colDef = columns.find(c => c.key === colKey);
+        setSelectedCell({
+          rowId: prevTx.id,
+          rowIndex: startIndex + currentIdx - 1,
+          colKey,
+          colLetter: colDef?.letter || 'A'
+        });
+        setFormulaBarValue(String(getCellValue(prevTx, colKey)));
+        scrollToCell(`cell-${prevTx.id}-${colKey}`);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
       handleCommitEdit(rowId, colKey, value);
       if (currentIdx + 1 < displayedTransactions.length) {
         const nextTx = displayedTransactions[currentIdx + 1];
@@ -473,27 +810,350 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           colKey,
           colLetter: colDef?.letter || 'A'
         });
-        setFormulaBarValue(String(nextTx[colKey] !== undefined ? nextTx[colKey] : ''));
-      }
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      handleCommitEdit(rowId, colKey, value);
-      const colIdx = columns.findIndex(c => c.key === colKey);
-      if (colIdx + 1 < columns.length) {
-        const nextCol = columns[colIdx + 1];
-        const curTx = displayedTransactions[currentIdx];
-        setSelectedCell({
-          rowId: curTx.id,
-          rowIndex: startIndex + currentIdx,
-          colKey: nextCol.key,
-          colLetter: nextCol.letter
-        });
-        setFormulaBarValue(String(curTx[nextCol.key] !== undefined ? curTx[nextCol.key] : ''));
+        setFormulaBarValue(String(getCellValue(nextTx, colKey)));
+        scrollToCell(`cell-${nextTx.id}-${colKey}`);
       }
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       setEditingCell(null);
     }
   };
+
+  // Comprehensive Excel Grid Arrow Key Navigation (Up, Down, Left, Right, Tab, Enter, F2, Delete)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || activeEl?.tagName === 'SELECT';
+
+      // Don't intercept if currently editing cell or if user is in search bar, formula bar, or dialog
+      if (editingCell || editingRawCell || isGeminiScannerOpen || isNewSheetModalOpen) {
+        return;
+      }
+
+      if (isInput && activeEl?.id !== 'formula-bar-input') {
+        return;
+      }
+
+      // 1. Raw Grid Mode
+      if (isRawMode && selectedRawCell) {
+        const { row, col } = selectedRawCell;
+        const colIdx = RAW_COLUMNS.indexOf(col);
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (row > 1) {
+            const nextRow = row - 1;
+            setSelectedRawCell({ row: nextRow, col });
+            setFormulaBarValue(rawGridData[nextRow]?.[col] || '');
+            scrollToCell(`raw-cell-${nextRow}-${col}`);
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (row < displayedRawRowCount) {
+            const nextRow = row + 1;
+            setSelectedRawCell({ row: nextRow, col });
+            setFormulaBarValue(rawGridData[nextRow]?.[col] || '');
+            scrollToCell(`raw-cell-${nextRow}-${col}`);
+          }
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (colIdx > 0) {
+            const nextCol = RAW_COLUMNS[colIdx - 1];
+            setSelectedRawCell({ row, col: nextCol });
+            setFormulaBarValue(rawGridData[row]?.[nextCol] || '');
+            scrollToCell(`raw-cell-${row}-${nextCol}`);
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (colIdx < RAW_COLUMNS.length - 1) {
+            const nextCol = RAW_COLUMNS[colIdx + 1];
+            setSelectedRawCell({ row, col: nextCol });
+            setFormulaBarValue(rawGridData[row]?.[nextCol] || '');
+            scrollToCell(`raw-cell-${row}-${nextCol}`);
+          }
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (colIdx > 0) {
+              const nextCol = RAW_COLUMNS[colIdx - 1];
+              setSelectedRawCell({ row, col: nextCol });
+              setFormulaBarValue(rawGridData[row]?.[nextCol] || '');
+              scrollToCell(`raw-cell-${row}-${nextCol}`);
+            } else if (row > 1) {
+              const nextCol = RAW_COLUMNS[RAW_COLUMNS.length - 1];
+              setSelectedRawCell({ row: row - 1, col: nextCol });
+              setFormulaBarValue(rawGridData[row - 1]?.[nextCol] || '');
+              scrollToCell(`raw-cell-${row - 1}-${nextCol}`);
+            }
+          } else {
+            if (colIdx < RAW_COLUMNS.length - 1) {
+              const nextCol = RAW_COLUMNS[colIdx + 1];
+              setSelectedRawCell({ row, col: nextCol });
+              setFormulaBarValue(rawGridData[row]?.[nextCol] || '');
+              scrollToCell(`raw-cell-${row}-${nextCol}`);
+            } else if (row < displayedRawRowCount) {
+              const nextCol = RAW_COLUMNS[0];
+              setSelectedRawCell({ row: row + 1, col: nextCol });
+              setFormulaBarValue(rawGridData[row + 1]?.[nextCol] || '');
+              scrollToCell(`raw-cell-${row + 1}-${nextCol}`);
+            }
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (row > 1) {
+              const nextRow = row - 1;
+              setSelectedRawCell({ row: nextRow, col });
+              setFormulaBarValue(rawGridData[nextRow]?.[col] || '');
+              scrollToCell(`raw-cell-${nextRow}-${col}`);
+            }
+          } else {
+            if (row < displayedRawRowCount) {
+              const nextRow = row + 1;
+              setSelectedRawCell({ row: nextRow, col });
+              setFormulaBarValue(rawGridData[nextRow]?.[col] || '');
+              scrollToCell(`raw-cell-${nextRow}-${col}`);
+            }
+          }
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          setSelectedRawCell({ row, col: RAW_COLUMNS[0] });
+          setFormulaBarValue(rawGridData[row]?.[RAW_COLUMNS[0]] || '');
+          scrollToCell(`raw-cell-${row}-${RAW_COLUMNS[0]}`);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          const lastCol = RAW_COLUMNS[RAW_COLUMNS.length - 1];
+          setSelectedRawCell({ row, col: lastCol });
+          setFormulaBarValue(rawGridData[row]?.[lastCol] || '');
+          scrollToCell(`raw-cell-${row}-${lastCol}`);
+        } else if (e.key === 'F2') {
+          e.preventDefault();
+          setEditingRawCell({ row, col });
+          setRawCellEditValue(rawGridData[row]?.[col] || '');
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          handleRawCellChange(row, col, '');
+          setFormulaBarValue('');
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          setEditingRawCell({ row, col });
+          setRawCellEditValue(e.key);
+        }
+        return;
+      }
+
+      // 2. 15-Column Institutional Sheet Mode
+      if (!isRawMode && selectedCell) {
+        const { rowId, colKey } = selectedCell;
+        const currentIdx = displayedTransactions.findIndex(t => t.id === rowId);
+        if (currentIdx === -1) return;
+        const colIdx = columns.findIndex(c => c.key === colKey);
+        if (colIdx === -1) return;
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (currentIdx > 0) {
+            const nextTx = displayedTransactions[currentIdx - 1];
+            const colDef = columns[colIdx];
+            setSelectedCell({
+              rowId: nextTx.id,
+              rowIndex: startIndex + currentIdx - 1,
+              colKey,
+              colLetter: colDef.letter,
+            });
+            setFormulaBarValue(String(getCellValue(nextTx, colKey)));
+            scrollToCell(`cell-${nextTx.id}-${colKey}`);
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (currentIdx < displayedTransactions.length - 1) {
+            const nextTx = displayedTransactions[currentIdx + 1];
+            const colDef = columns[colIdx];
+            setSelectedCell({
+              rowId: nextTx.id,
+              rowIndex: startIndex + currentIdx + 1,
+              colKey,
+              colLetter: colDef.letter,
+            });
+            setFormulaBarValue(String(getCellValue(nextTx, colKey)));
+            scrollToCell(`cell-${nextTx.id}-${colKey}`);
+          }
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (colIdx > 0) {
+            const nextCol = columns[colIdx - 1];
+            const curTx = displayedTransactions[currentIdx];
+            setSelectedCell({
+              rowId: curTx.id,
+              rowIndex: startIndex + currentIdx,
+              colKey: nextCol.key,
+              colLetter: nextCol.letter,
+            });
+            setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+            scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (colIdx < columns.length - 1) {
+            const nextCol = columns[colIdx + 1];
+            const curTx = displayedTransactions[currentIdx];
+            setSelectedCell({
+              rowId: curTx.id,
+              rowIndex: startIndex + currentIdx,
+              colKey: nextCol.key,
+              colLetter: nextCol.letter,
+            });
+            setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+            scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+          }
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (colIdx > 0) {
+              const nextCol = columns[colIdx - 1];
+              const curTx = displayedTransactions[currentIdx];
+              setSelectedCell({
+                rowId: curTx.id,
+                rowIndex: startIndex + currentIdx,
+                colKey: nextCol.key,
+                colLetter: nextCol.letter,
+              });
+              setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+              scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+            } else if (currentIdx > 0) {
+              const nextCol = columns[columns.length - 1];
+              const prevTx = displayedTransactions[currentIdx - 1];
+              setSelectedCell({
+                rowId: prevTx.id,
+                rowIndex: startIndex + currentIdx - 1,
+                colKey: nextCol.key,
+                colLetter: nextCol.letter,
+              });
+              setFormulaBarValue(String(getCellValue(prevTx, nextCol.key)));
+              scrollToCell(`cell-${prevTx.id}-${nextCol.key}`);
+            }
+          } else {
+            if (colIdx < columns.length - 1) {
+              const nextCol = columns[colIdx + 1];
+              const curTx = displayedTransactions[currentIdx];
+              setSelectedCell({
+                rowId: curTx.id,
+                rowIndex: startIndex + currentIdx,
+                colKey: nextCol.key,
+                colLetter: nextCol.letter,
+              });
+              setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
+              scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+            } else if (currentIdx < displayedTransactions.length - 1) {
+              const nextCol = columns[0];
+              const nextTx = displayedTransactions[currentIdx + 1];
+              setSelectedCell({
+                rowId: nextTx.id,
+                rowIndex: startIndex + currentIdx + 1,
+                colKey: nextCol.key,
+                colLetter: nextCol.letter,
+              });
+              setFormulaBarValue(String(getCellValue(nextTx, nextCol.key)));
+              scrollToCell(`cell-${nextTx.id}-${nextCol.key}`);
+            }
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (currentIdx > 0) {
+              const prevTx = displayedTransactions[currentIdx - 1];
+              const colDef = columns[colIdx];
+              setSelectedCell({
+                rowId: prevTx.id,
+                rowIndex: startIndex + currentIdx - 1,
+                colKey,
+                colLetter: colDef.letter,
+              });
+              setFormulaBarValue(String(getCellValue(prevTx, colKey)));
+              scrollToCell(`cell-${prevTx.id}-${colKey}`);
+            }
+          } else {
+            if (currentIdx < displayedTransactions.length - 1) {
+              const nextTx = displayedTransactions[currentIdx + 1];
+              const colDef = columns[colIdx];
+              setSelectedCell({
+                rowId: nextTx.id,
+                rowIndex: startIndex + currentIdx + 1,
+                colKey,
+                colLetter: colDef.letter,
+              });
+              setFormulaBarValue(String(getCellValue(nextTx, colKey)));
+              scrollToCell(`cell-${nextTx.id}-${colKey}`);
+            }
+          }
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          const firstCol = columns[0];
+          const curTx = displayedTransactions[currentIdx];
+          setSelectedCell({
+            rowId: curTx.id,
+            rowIndex: startIndex + currentIdx,
+            colKey: firstCol.key,
+            colLetter: firstCol.letter,
+          });
+          setFormulaBarValue(String(getCellValue(curTx, firstCol.key)));
+          scrollToCell(`cell-${curTx.id}-${firstCol.key}`);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          const lastCol = columns[columns.length - 1];
+          const curTx = displayedTransactions[currentIdx];
+          setSelectedCell({
+            rowId: curTx.id,
+            rowIndex: startIndex + currentIdx,
+            colKey: lastCol.key,
+            colLetter: lastCol.letter,
+          });
+          setFormulaBarValue(String(getCellValue(curTx, lastCol.key)));
+          scrollToCell(`cell-${curTx.id}-${lastCol.key}`);
+        } else if (e.key === 'F2') {
+          if (colKey !== 'balance' && colKey !== 'amount') {
+            e.preventDefault();
+            const curTx = displayedTransactions[currentIdx];
+            setEditingCell({ rowId, colKey });
+            setCellEditValue(String(getCellValue(curTx, colKey)));
+          }
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (colKey !== 'balance' && colKey !== 'amount') {
+            e.preventDefault();
+            if (MONTH_KEYS.includes(colKey as any)) {
+              handleCommitEdit(rowId, colKey, '0');
+            } else {
+              const emptyVal = ['monthlyAmount', 'quarterlyAmount', 'annuallyAmount'].includes(colKey as string) ? 0 : '';
+              updateCell(rowId, colKey as keyof Transaction, emptyVal);
+              setFormulaBarValue('');
+            }
+          }
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          if (colKey !== 'balance' && colKey !== 'amount') {
+            e.preventDefault();
+            setEditingCell({ rowId, colKey });
+            setCellEditValue(e.key);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    selectedCell, 
+    selectedRawCell, 
+    editingCell, 
+    editingRawCell, 
+    isRawMode, 
+    displayedTransactions, 
+    rawGridData, 
+    columns, 
+    displayedRawRowCount, 
+    startIndex, 
+    isGeminiScannerOpen, 
+    isNewSheetModalOpen
+  ]);
 
   // Auto-seed starter rows for template sheets so user has ready rows by default
   useEffect(() => {
@@ -510,11 +1170,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       handleRawCellChange(selectedRawCell.row, selectedRawCell.col, formulaBarValue);
     } else {
       if (!selectedCell) return;
-      let finalVal: any = formulaBarValue;
-      if (['amount', 'monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(selectedCell.colKey as string)) {
-        finalVal = parseFloat(formulaBarValue) || 0;
-      }
-      updateCell(selectedCell.rowId, selectedCell.colKey, finalVal);
+      handleCommitEdit(selectedCell.rowId, selectedCell.colKey, formulaBarValue);
     }
   };
 
@@ -546,12 +1202,77 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // Create new sheet tab
   const handleCreateSheetTab = (e: React.FormEvent) => {
     e.preventDefault();
-    const tabName = newSheetName || `Sheet ${sheetTabs.length + 1}`;
-    addSheetTab(tabName, newSheetCategory || undefined);
+    const city = newSheetCity.trim();
+    const tabName = newSheetName.trim() || (city ? `${city} Worksheet` : `Sheet ${sheetTabs.length + 1}`);
+    if (newSheetFormat === 'raw') {
+      createRawBlankSheet(tabName, city || undefined);
+    } else {
+      createTemplateSheet(tabName, city || undefined);
+    }
     setIsNewSheetModalOpen(false);
     setNewSheetName('');
+    setNewSheetCity('');
     setNewSheetCategory('');
   };
+
+  // Create new project
+  const handleCreateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newProjectName.trim() || `JIM Punjab Campaign ${newProjectYear}`;
+    createProject(name, newProjectYear || '2026', newProjectDesc);
+    setIsNewProjectModalOpen(false);
+    setNewProjectName('');
+    setNewProjectYear('2026');
+    setNewProjectDesc('');
+  };
+
+  // Batch create and save sheets directly to Neon PostgreSQL database
+  const handleBatchSaveToDatabase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingToDb(true);
+    setDbSaveSuccessMsg(null);
+
+    let citiesToUse: string[] = [];
+    if (batchAutoCities) {
+      citiesToUse = PUNJAB_CITIES_PRESET.slice(0, batchCount);
+    } else if (batchCustomCities.trim()) {
+      citiesToUse = batchCustomCities
+        .split(/[,\n]/)
+        .map(c => c.trim())
+        .filter(Boolean);
+    }
+
+    try {
+      const created = await batchCreateAndSaveSheets(
+        batchCount,
+        citiesToUse,
+        batchFormat
+      );
+      setIsBatchModalOpen(false);
+      setDbSaveSuccessMsg(`Successfully created ${created.length} sheets and saved directly to Neon PostgreSQL database!`);
+      setTimeout(() => setDbSaveSuccessMsg(null), 5000);
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to save sheets to database: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSavingToDb(false);
+    }
+  };
+
+  // Explicitly sync all active sheets to Neon PostgreSQL database
+  const handleManualSaveAllToDb = async () => {
+    setIsSavingToDb(true);
+    const success = await saveAllSheetsToDatabase();
+    setIsSavingToDb(false);
+    if (success) {
+      setDbSaveSuccessMsg(`All ${sheetTabs.length} sheets and configurations saved to Neon PostgreSQL Database!`);
+      setTimeout(() => setDbSaveSuccessMsg(null), 4000);
+    } else {
+      alert('Error saving sheets to database.');
+    }
+  };
+
+  const currentProject = projects?.find(p => p.id === activeProjectId) || projects?.[0];
 
   const activeCellCoord = isRawMode
     ? (selectedRawCell ? `${selectedRawCell.col}${selectedRawCell.row}` : 'A1')
@@ -559,6 +1280,87 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
   return (
     <div className="space-y-4 pb-12">
+
+      {/* ====================================================================
+          PROJECT & YEAR CONTROL BAR (JIM PUNJAB) WITH BATCH & DB SYNC
+          ==================================================================== */}
+      <div className="bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-900 text-white rounded-2xl p-4 sm:p-5 border-2 border-amber-400/80 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-arabic text-amber-300 font-bold text-sm sm:text-base">جماعت اصلاح المسلمین پنجاب</span>
+            <span className="text-amber-400/70 text-xs">✦</span>
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-300">JIM Punjab Campaigns</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Briefcase className="w-4 h-4 text-amber-400" />
+            <h2 className="text-sm sm:text-base font-black text-white">
+              Project: {currentProject?.name || 'JIM Punjab Campaign'}
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-400 text-slate-950 font-mono">
+              Year {currentProject?.year || '2026'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Project Switcher Dropdown */}
+          <div className="flex items-center gap-1.5 bg-emerald-900/80 px-2.5 py-1.5 rounded-xl border border-emerald-700/80 text-xs">
+            <span className="text-emerald-300 font-bold hidden sm:inline">Campaign:</span>
+            <select
+              value={activeProjectId}
+              onChange={(e) => setActiveProjectId(e.target.value)}
+              className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                  {p.name} ({p.year})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Batch Sheets Generator Button (Select How Many Sheets & Save to DB) */}
+          <button
+            onClick={() => setIsBatchModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer ring-2 ring-amber-400/30"
+            title="Select how many sheets you need and save them directly to Neon PostgreSQL database"
+          >
+            <Layers className="w-3.5 h-3.5 text-slate-950" />
+            <span>⚡ Multi-Sheet Creator</span>
+          </button>
+
+          {/* Save All Sheets to Database Button */}
+          <button
+            onClick={handleManualSaveAllToDb}
+            disabled={isSavingToDb}
+            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-blue-400/80 cursor-pointer disabled:opacity-50"
+            title="Save all working sheets directly to Neon PostgreSQL Cloud Database"
+          >
+            <Database className="w-3.5 h-3.5 text-blue-200" />
+            <span>{isSavingToDb ? 'Saving...' : '💾 Save All to DB'}</span>
+          </button>
+
+          {/* Create New Project Button */}
+          <button
+            onClick={() => setIsNewProjectModalOpen(true)}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-slate-700 cursor-pointer"
+            title="Create New Project and specify Year (e.g. 2026)"
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+            <span>+ Project</span>
+          </button>
+
+          {/* Add Sheet with City Button */}
+          <button
+            onClick={() => setIsNewSheetModalOpen(true)}
+            className="px-3 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-emerald-600/80 cursor-pointer"
+            title="Add a single new city working sheet"
+          >
+            <MapPin className="w-3.5 h-3.5 text-amber-300" />
+            <span>+ City Sheet</span>
+          </button>
+        </div>
+      </div>
       
       {/* SPREADSHEET CARD */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
@@ -864,6 +1666,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           <div className="flex flex-wrap items-center justify-between p-2 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 gap-2 text-xs">
             
             <div className="flex flex-wrap items-center gap-1.5">
+              {/* Type filter */}
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value as any)}
@@ -874,23 +1677,54 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                 <option value="expense">Expense Only</option>
               </select>
 
+              {/* Punjab Zila / District Slicer */}
               <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold max-w-[170px]"
+                value={selectedZila}
+                onChange={(e) => setSelectedZila(e.target.value)}
+                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold max-w-[150px]"
+                title="Filter by Punjab Zila / District"
               >
-                <option value="all">All Fund Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nameEnglish}</option>
+                <option value="all">📍 All Zilas / اضلاع</option>
+                {availableZilas.map((z) => (
+                  <option key={z} value={z}>{z}</option>
                 ))}
               </select>
 
+              {/* Branch Slicer (if available) */}
+              {availableBranches.length > 0 && (
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold max-w-[140px]"
+                  title="Filter by Branch"
+                >
+                  <option value="all">🏢 All Branches</option>
+                  {availableBranches.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Accounting Contribution Status Slicer */}
+              <select
+                value={selectedAccountingStatus}
+                onChange={(e) => setSelectedAccountingStatus(e.target.value as any)}
+                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                title="Filter by Member Contribution Status"
+              >
+                <option value="all">📊 All Statuses</option>
+                <option value="paid">✓ Fully Paid</option>
+                <option value="due">⚠️ Balance Due</option>
+                <option value="unpaid">✗ Unpaid</option>
+              </select>
+
+              {/* Payment Mode */}
               <select
                 value={selectedPaymentMode}
                 onChange={(e) => setSelectedPaymentMode(e.target.value)}
                 className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
               >
-                <option value="all">All Payment Modes</option>
+                <option value="all">All Modes</option>
                 <option value="Online">Online Transfer</option>
                 <option value="Cash">Cash</option>
                 <option value="Cheque">Cheque</option>
@@ -991,11 +1825,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                 if (isRawMode && selectedRawCell) {
                   handleRawCellChange(selectedRawCell.row, selectedRawCell.col, val);
                 } else if (!isRawMode && selectedCell) {
-                  let finalVal: any = val;
-                  if (selectedCell.colKey === 'amount') {
-                    finalVal = parseFloat(val) || 0;
-                  }
-                  updateCell(selectedCell.rowId, selectedCell.colKey, finalVal);
+                  handleCommitEdit(selectedCell.rowId, selectedCell.colKey, val);
                 }
               }}
               placeholder={isRawMode ? "Type text, numbers, or formula (=SUM(A1:A10)) into active cell..." : "Type text or value into active cell (live update)..."}
@@ -1042,7 +1872,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     <tr key={rowNum} className="hover:bg-slate-50 dark:hover:bg-slate-850/50">
                       
                       {/* Sticky Row Number Index */}
-                      <td className="w-12 p-2 text-center font-mono font-bold text-slate-500 dark:text-slate-400 border-r border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 sticky left-0 z-10">
+                      <td className={`w-12 p-2 text-center font-mono font-bold border-r border-slate-300 dark:border-slate-700 sticky left-0 z-10 transition-colors select-none ${
+                        selectedRawCell?.row === rowNum 
+                          ? 'bg-emerald-600 text-white font-black shadow-xs' 
+                          : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                      }`}>
                         {rowNum}
                       </td>
 
@@ -1055,9 +1889,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         return (
                           <td
                             key={col}
+                            id={`raw-cell-${rowNum}-${col}`}
                             onClick={() => {
                               setSelectedRawCell({ row: rowNum, col });
                               setFormulaBarValue(cellVal);
+                              setEditingRawCell(null);
                             }}
                             onDoubleClick={() => {
                               setSelectedRawCell({ row: rowNum, col });
@@ -1065,8 +1901,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               setRawCellEditValue(cellVal);
                               setFormulaBarValue(cellVal);
                             }}
-                            className={`p-1.5 border-r border-slate-200 dark:border-slate-800 cursor-cell relative min-h-[28px] overflow-hidden truncate max-w-[180px] ${
-                              isSelected ? 'ring-2 ring-emerald-500 bg-emerald-50/25 dark:bg-emerald-950/20 z-10' : ''
+                            className={`p-1.5 border-r border-b border-slate-200 dark:border-slate-800 cursor-cell relative min-h-[28px] overflow-hidden truncate max-w-[180px] select-none ${
+                              isSelected 
+                                ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' 
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
                             }`}
                           >
                             {isEditing ? (
@@ -1086,9 +1924,36 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                                   if (e.key === 'Enter') {
                                     handleRawCellChange(rowNum, col, rawCellEditValue);
                                     setEditingRawCell(null);
-                                    if (rowNum < rawRowCount) {
+                                    if (e.shiftKey) {
+                                      if (rowNum > 1) {
+                                        setSelectedRawCell({ row: rowNum - 1, col });
+                                        setFormulaBarValue(rawGridData[rowNum - 1]?.[col] || '');
+                                        scrollToCell(`raw-cell-${rowNum - 1}-${col}`);
+                                      }
+                                    } else {
+                                      if (rowNum < displayedRawRowCount) {
+                                        setSelectedRawCell({ row: rowNum + 1, col });
+                                        setFormulaBarValue(rawGridData[rowNum + 1]?.[col] || '');
+                                        scrollToCell(`raw-cell-${rowNum + 1}-${col}`);
+                                      }
+                                    }
+                                  } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    handleRawCellChange(rowNum, col, rawCellEditValue);
+                                    setEditingRawCell(null);
+                                    if (rowNum > 1) {
+                                      setSelectedRawCell({ row: rowNum - 1, col });
+                                      setFormulaBarValue(rawGridData[rowNum - 1]?.[col] || '');
+                                      scrollToCell(`raw-cell-${rowNum - 1}-${col}`);
+                                    }
+                                  } else if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    handleRawCellChange(rowNum, col, rawCellEditValue);
+                                    setEditingRawCell(null);
+                                    if (rowNum < displayedRawRowCount) {
                                       setSelectedRawCell({ row: rowNum + 1, col });
                                       setFormulaBarValue(rawGridData[rowNum + 1]?.[col] || '');
+                                      scrollToCell(`raw-cell-${rowNum + 1}-${col}`);
                                     }
                                   } else if (e.key === 'Escape') {
                                     setEditingRawCell(null);
@@ -1096,11 +1961,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                                     e.preventDefault();
                                     handleRawCellChange(rowNum, col, rawCellEditValue);
                                     setEditingRawCell(null);
-                                    const nextColIdx = RAW_COLUMNS.indexOf(col) + 1;
-                                    if (nextColIdx < RAW_COLUMNS.length) {
+                                    const nextColIdx = RAW_COLUMNS.indexOf(col) + (e.shiftKey ? -1 : 1);
+                                    if (nextColIdx >= 0 && nextColIdx < RAW_COLUMNS.length) {
                                       const nextCol = RAW_COLUMNS[nextColIdx];
                                       setSelectedRawCell({ row: rowNum, col: nextCol });
                                       setFormulaBarValue(rawGridData[rowNum]?.[nextCol] || '');
+                                      scrollToCell(`raw-cell-${rowNum}-${nextCol}`);
                                     }
                                   }
                                 }}
@@ -1110,6 +1976,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               <span className="block truncate select-text">
                                 {cellVal || <span className="text-transparent select-none">-</span>}
                               </span>
+                            )}
+
+                            {isSelected && !isEditing && (
+                              <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
                             )}
                           </td>
                         );
@@ -1187,649 +2057,780 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           </div>
         ) : (
           /* ========================================================================= */
-          /* MODE B: 9-COLUMN INSTITUTIONAL SPREADSHEET TEMPLATE                       */
+          /* MODE B: 26-COLUMN COMPLETE ACCOUNTING LEDGER (JIM PUNJAB MEMBERSHIP FUND)  */
           /* ========================================================================= */
-          <div className="overflow-x-auto max-h-[620px] bg-white dark:bg-slate-950">
-            <table className="w-full text-left border-collapse font-sans text-xs">
-            
-            {/* Column Letter & Title Headers */}
-            <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700 select-none shadow-xs">
-              <tr>
-                {/* Row Number Corner Box (Sticky Left) */}
-                <th rowSpan={2} className="w-12 p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
-                  #
-                </th>
-
-                {/* Col A: Receipt No */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
-                    <span className="text-[9px] text-slate-400">رسید نمبر</span>
-                  </div>
-                </th>
-
-                {/* Col B: Date */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Date</span>
-                    <span className="text-[9px] text-slate-400">تاریخ</span>
-                  </div>
-                </th>
-
-                {/* Col C: Received From */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-48 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Received From</span>
-                    <span className="text-[9px] text-slate-400">وصول کنندہ / اسم گرامی</span>
-                  </div>
-                </th>
-
-                {/* Col D: Address */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Address</span>
-                    <span className="text-[9px] text-slate-400">مکمل پتہ</span>
-                  </div>
-                </th>
-
-                {/* Col E: City */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">City</span>
-                    <span className="text-[9px] text-slate-400">شہر</span>
-                  </div>
-                </th>
-
-                {/* Multi-Tier Group Header: Preferred Period (Spans 4 columns: F, G, H, I) */}
-                <th colSpan={4} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-emerald-100/90 via-teal-100/90 to-emerald-100/90 dark:from-emerald-950/80 dark:via-teal-950/80 dark:to-emerald-950/80 text-emerald-900 dark:text-emerald-200">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-[12px] uppercase tracking-wider font-black">Preferred Period</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold">مدت / میعاد</span>
-                  </div>
-                </th>
-
-                {/* Col J: Total Amount as Period */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-40 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">J</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Amount as Period</span>
-                    <span className="text-[9px] text-slate-400">میعاد کے مطابق کل رقم</span>
-                  </div>
-                </th>
-
-                {/* Col K: Cheque or CASH */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">K</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Cheque or CASH</span>
-                    <span className="text-[9px] text-slate-400">ذریعہ ادائیگی</span>
-                  </div>
-                </th>
-
-                {/* Col L: Bank Name */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">L</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Bank Name</span>
-                    <span className="text-[9px] text-slate-400">بینک کا نام</span>
-                  </div>
-                </th>
-
-                {/* Col M: Mobile Number */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">M</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mobile Number</span>
-                    <span className="text-[9px] text-slate-400">موبائل نمبر</span>
-                  </div>
-                </th>
-
-                {/* Col N: Fund Category */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">N</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Fund Category</span>
-                    <span className="text-[9px] text-slate-400">مد / کھاتہ</span>
-                  </div>
-                </th>
-
-                {/* Col O: Notes / Remarks */}
-                <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">O</span>
-                    <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Notes / Remarks</span>
-                    <span className="text-[9px] text-slate-400">تفصیل / کیفیات</span>
-                  </div>
-                </th>
-
-                {/* Actions Header */}
-                <th rowSpan={2} className="w-24 p-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-slate-300 dark:border-slate-700 align-middle">
-                  Actions
-                </th>
-              </tr>
-
-              {/* Second Row: Sub-columns for Preferred Period */}
-              <tr className="bg-emerald-50/70 dark:bg-emerald-950/40">
-                {/* Col F: Monthly */}
-                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">F</span>
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Monthly</span>
-                    <span className="text-[9px] text-slate-500">ماہانہ</span>
-                  </div>
-                </th>
-
-                {/* Col G: Quarterly */}
-                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">G</span>
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Quarterly</span>
-                    <span className="text-[9px] text-slate-500">سہ ماہی</span>
-                  </div>
-                </th>
-
-                {/* Col H: Half Yearly */}
-                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">H</span>
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Half Yearly</span>
-                    <span className="text-[9px] text-slate-500">شش ماہی</span>
-                  </div>
-                </th>
-
-                {/* Col I: Annually */}
-                <th className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 text-center w-28 hover:bg-emerald-100/60 dark:hover:bg-slate-700/60 transition-colors">
-                  <div className="flex flex-col items-center justify-center gap-0.5">
-                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[11px]">I</span>
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Annually</span>
-                    <span className="text-[9px] text-slate-500">سالانہ</span>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-
-            {/* Spreadsheet Rows */}
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {displayedTransactions.length === 0 ? (
+          <div className="flex flex-col bg-white dark:bg-slate-950">
+            {/* Scrollable 26-Column Table */}
+            <div className="overflow-x-auto max-h-[680px]">
+              <table className="w-full text-left border-collapse font-sans text-xs">
+              
+              {/* Column Letter & Title Headers */}
+              <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700 select-none shadow-xs">
                 <tr>
-                  <td colSpan={columns.length + 2} className="py-16 px-4 text-center">
-                    <div className="max-w-md mx-auto space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
-                        <FileSpreadsheet className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-700 dark:text-slate-200 text-sm">
-                          {currentSheetTab?.name || 'Sheet'} is currently empty
-                        </h4>
-                        <p className="text-xs text-slate-400 mt-1">
-                          No records recorded in this ledger yet. Add rows directly or generate a monthly/weekly periodic template.
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                        <button
-                          onClick={() => addBlankRow(25)}
-                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>+ Add 25 Blank Rows</span>
-                        </button>
-                        <button
-                          onClick={() => addBlankRow(100)}
-                          className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>+ Add 100 Blank Rows</span>
-                        </button>
-                        <button
-                          onClick={() => setIsPeriodicModalOpen(true)}
-                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>Setup Monthly/Weekly Ledger</span>
-                        </button>
-                      </div>
+                  {/* Row Number Corner Box (Sticky Left) */}
+                  <th rowSpan={2} className="w-12 p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
+                    #
+                  </th>
+
+                  {/* Col A: Receipt No */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
+                      <span className="text-[9px] text-slate-400">رسید نمبر</span>
                     </div>
-                  </td>
+                  </th>
+
+                  {/* Col B: Date */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Date</span>
+                      <span className="text-[9px] text-slate-400">تاریخ</span>
+                    </div>
+                  </th>
+
+                  {/* Col C: Donor Name */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Donor Name</span>
+                      <span className="text-[9px] text-slate-400">نام دہندہ / ممبر</span>
+                    </div>
+                  </th>
+
+                  {/* Col D: Branch Name */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Branch</span>
+                      <span className="text-[9px] text-slate-400">شاخ / برانچ</span>
+                    </div>
+                  </th>
+
+                  {/* Col E: Zila */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Zila</span>
+                      <span className="text-[9px] text-slate-400">ضلع</span>
+                    </div>
+                  </th>
+
+                  {/* Col F: Phone */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">F</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Phone</span>
+                      <span className="text-[9px] text-slate-400">فون نمبر</span>
+                    </div>
+                  </th>
+
+                  {/* Multi-Tier Group Header: Pledged Commitments (Spans 3 cols: G, H, I) */}
+                  <th colSpan={3} className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-blue-100/90 via-indigo-100/90 to-blue-100/90 dark:from-blue-950/80 dark:via-indigo-950/80 dark:to-blue-950/80 text-blue-900 dark:text-blue-200">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-[11px] uppercase tracking-wider font-black">Pledged Target</span>
+                      <span className="text-[9px] px-2 py-0.2 rounded-full bg-blue-600 text-white font-bold">معینہ ہدف</span>
+                    </div>
+                  </th>
+
+                  {/* Multi-Tier Group Header: 2026 Monthly Breakdown (Spans 12 cols: J through U) */}
+                  <th colSpan={12} className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-emerald-100/90 via-teal-100/90 to-emerald-100/90 dark:from-emerald-950/80 dark:via-teal-950/80 dark:to-emerald-950/80 text-emerald-900 dark:text-emerald-200">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-[11px] uppercase tracking-wider font-black">2026 Monthly Contributions</span>
+                      <span className="text-[9px] px-2 py-0.2 rounded-full bg-emerald-600 text-white font-bold">ماہانہ وصولیاں برائے 2026</span>
+                    </div>
+                  </th>
+
+                  {/* Col V: Total Paid */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">V</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Paid</span>
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">کل وصولی</span>
+                    </div>
+                  </th>
+
+                  {/* Col W: Balance Due */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">W</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Balance Due</span>
+                      <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">واجب الادا</span>
+                    </div>
+                  </th>
+
+                  {/* Col X: Payment Mode */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">X</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mode</span>
+                      <span className="text-[9px] text-slate-400">ادائیگی</span>
+                    </div>
+                  </th>
+
+                  {/* Col Y: Bank Name */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Y</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Bank Name</span>
+                      <span className="text-[9px] text-slate-400">بینک کا نام</span>
+                    </div>
+                  </th>
+
+                  {/* Col Z: Remarks */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Z</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Remarks</span>
+                      <span className="text-[9px] text-slate-400">کیفیات</span>
+                    </div>
+                  </th>
+
+                  {/* Actions Header */}
+                  <th rowSpan={2} className="w-28 p-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-slate-300 dark:border-slate-700 align-middle">
+                    Actions
+                  </th>
                 </tr>
-              ) : (
-                displayedTransactions.map((tx, idx) => {
-                  const rowIndex = startIndex + idx;
-                  const isRowSelected = selectedCell?.rowId === tx.id;
 
-                  return (
-                    <tr 
-                      key={tx.id}
-                      className={`hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors group ${
-                        isRowSelected ? 'bg-blue-50/30 dark:bg-slate-800/30' : ''
-                      }`}
-                    >
-                      {/* Row Number (1, 2, 3...) Sticky Left */}
-                      <td className="w-12 p-2 text-center font-mono font-bold text-slate-500 dark:text-slate-400 border-r border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 sticky left-0 z-10 select-none">
-                        {rowIndex + 1}
-                      </td>
+                {/* Subheaders Row: G, H, I (Targets) and J to U (12 Months) */}
+                <tr className="bg-slate-50 dark:bg-slate-850">
+                  {/* Col G: Monthly */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">G</span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Monthly</span>
+                      <span className="text-[8px] text-slate-500">ماہانہ</span>
+                    </div>
+                  </th>
 
-                      {/* Column A: Receipt No */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'receiptNo', 'A')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'receiptNo')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono font-bold text-blue-600 dark:text-blue-400 cursor-cell relative ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'receiptNo' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
+                  {/* Col H: Quarterly */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">H</span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Quarterly</span>
+                      <span className="text-[8px] text-slate-500">سہ ماہی</span>
+                    </div>
+                  </th>
+
+                  {/* Col I: Annually */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">I</span>
+                      <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Annually</span>
+                      <span className="text-[8px] text-slate-500">سالانہ</span>
+                    </div>
+                  </th>
+
+                  {/* Cols J through U: 12 Months */}
+                  {MONTH_KEYS.map((mKey, mIdx) => {
+                    const letter = String.fromCharCode(74 + mIdx); // 74 is 'J'
+                    const mLabel = MONTH_LABELS[mKey];
+                    const isFocused = focusedMonth === mKey;
+                    return (
+                      <th
+                        key={mKey}
+                        className={`p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-20 transition-colors ${
+                          isFocused 
+                            ? 'bg-emerald-200 dark:bg-emerald-900/60 font-black text-emerald-900 dark:text-white' 
+                            : 'bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-100/50'
                         }`}
                       >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'receiptNo' ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'receiptNo', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'receiptNo', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate">{tx.receiptNo}</span>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleOpenVoucher(tx); }}
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-blue-100 dark:hover:bg-slate-700 text-slate-500"
-                              title="Open Voucher"
-                            >
-                              <Receipt className="w-3 h-3 text-blue-500" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black text-[10px]">{letter}</span>
+                          <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{mLabel.en}</span>
+                          <span className="text-[8px] text-slate-500">{mLabel.ur}</span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
 
-                      {/* Column B: Date */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'date', 'B')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'date')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono text-center cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'date' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'date' ? (
-                          <input
-                            type="date"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'date', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'date', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          tx.date
-                        )}
-                      </td>
-
-                      {/* Column C: Donor / Payee Name (English) */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'C')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'donorName' ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'donorName', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'donorName', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          <span className="font-semibold">{tx.donorName || tx.donorNameUrdu || '---'}</span>
-                        )}
-                      </td>
-
-                      {/* Column D: Address */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'address', 'D')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'address')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'address' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'address' ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'address', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'address', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          <span className="text-slate-600 dark:text-slate-300 truncate block max-w-xs">{tx.address || '---'}</span>
-                        )}
-                      </td>
-
-                      {/* Column E: City */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'city', 'E')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'city')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'city' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'city' ? (
-                          <input
-                            type="text"
-                            list="pakistan-cities"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'city', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'city', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.city || '---'}</span>
-                        )}
-                      </td>
-
-                      {/* Column F: Monthly */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'F')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'monthlyAmount')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'monthlyAmount' ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'monthlyAmount', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'monthlyAmount', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                          />
-                        ) : tx.monthlyAmount && tx.monthlyAmount > 0 ? (
-                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                            {Number(tx.monthlyAmount).toLocaleString()}
-                          </span>
-                        ) : tx.preferredPeriod === 'Monthly' ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
-                        )}
-                      </td>
-
-                      {/* Column G: Quarterly */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'G')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'quarterlyAmount')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'quarterlyAmount' ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'quarterlyAmount', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'quarterlyAmount', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                          />
-                        ) : tx.quarterlyAmount && tx.quarterlyAmount > 0 ? (
-                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                            {Number(tx.quarterlyAmount).toLocaleString()}
-                          </span>
-                        ) : tx.preferredPeriod === 'Quarterly' ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
-                        )}
-                      </td>
-
-                      {/* Column H: Half Yearly */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'halfYearlyAmount', 'H')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'halfYearlyAmount')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'halfYearlyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'halfYearlyAmount' ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'halfYearlyAmount', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'halfYearlyAmount', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                          />
-                        ) : tx.halfYearlyAmount && tx.halfYearlyAmount > 0 ? (
-                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                            {Number(tx.halfYearlyAmount).toLocaleString()}
-                          </span>
-                        ) : tx.preferredPeriod === 'Half Yearly' ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
-                        )}
-                      </td>
-
-                      {/* Column I: Annually */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'I')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'annuallyAmount')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'annuallyAmount' ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'annuallyAmount', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'annuallyAmount', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                          />
-                        ) : tx.annuallyAmount && tx.annuallyAmount > 0 ? (
-                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                            {Number(tx.annuallyAmount).toLocaleString()}
-                          </span>
-                        ) : tx.preferredPeriod === 'Annually' ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-[10px]">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600 font-mono text-[11px]">-</span>
-                        )}
-                      </td>
-
-                      {/* Column J: Total Amount as Period */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'J')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'amount')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'amount' ? (
-                          <input
-                            type="number"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'amount', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'amount', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                          />
-                        ) : (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                            {Number(tx.amount || 0).toLocaleString()}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Column K: Cheque or CASH */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'K')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 text-center ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        <select
-                          value={tx.paymentMode || 'Cash'}
-                          onChange={(e) => updateCell(tx.id, 'paymentMode', e.target.value as any)}
-                          className="w-full bg-transparent border-0 text-xs font-semibold focus:outline-none cursor-pointer text-center"
-                        >
-                          <option value="Cash">Cash</option>
-                          <option value="Cheque">Cheque</option>
-                          <option value="Online">Online Transfer</option>
-                          <option value="DD">Demand Draft (DD)</option>
-                        </select>
-                      </td>
-
-                      {/* Column L: Bank Name */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'L')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'bankName')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'bankName' ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'bankName', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'bankName', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          tx.bankName || '---'
-                        )}
-                      </td>
-
-                      {/* Column M: Mobile Number */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'M')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'phone')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'phone' ? (
-                          <input
-                            type="tel"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'phone', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'phone', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs font-mono"
-                          />
-                        ) : (
-                          tx.phone || '---'
-                        )}
-                      </td>
-
-                      {/* Column N: Fund Category */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'categoryId', 'N')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-pointer ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'categoryId' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        <select
-                          value={tx.categoryId}
-                          onChange={(e) => updateCell(tx.id, 'categoryId', e.target.value)}
-                          className="w-full bg-transparent border-0 text-xs font-semibold focus:outline-none cursor-pointer"
-                        >
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.nameEnglish} ({c.nameUrdu})
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Column O: Notes / Remarks */}
-                      <td 
-                        onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'O')}
-                        onDoubleClick={() => handleCellDoubleClick(tx.id, 'notes')}
-                        className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell ${
-                          selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''
-                        }`}
-                      >
-                        {editingCell?.rowId === tx.id && editingCell.colKey === 'notes' ? (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={cellEditValue}
-                            onChange={(e) => setCellEditValue(e.target.value)}
-                            onBlur={() => handleCommitEdit(tx.id, 'notes', cellEditValue)}
-                            onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'notes', idx, cellEditValue)}
-                            className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                          />
-                        ) : (
-                          <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">{tx.notes || '---'}</span>
-                        )}
-                      </td>
-
-
-                      {/* Actions */}
-                      <td className="p-2 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-1">
+              {/* Spreadsheet Rows */}
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {displayedTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={28} className="py-16 px-4 text-center">
+                      <div className="max-w-md mx-auto space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+                          <FileSpreadsheet className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-700 dark:text-slate-200 text-sm">
+                            {currentSheetTab?.name || 'Sheet'} is currently empty
+                          </h4>
+                          <p className="text-xs text-slate-400 mt-1">
+                            No member records found matching the active filters. Add blank rows or import donor records.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                           <button
-                            onClick={() => handleOpenVoucher(tx)}
-                            className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                            title="Print / View Voucher"
+                            onClick={() => addBlankRow(25)}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add 25 Blank Rows</span>
                           </button>
                           <button
-                            onClick={() => duplicateTransaction(tx.id)}
-                            className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
-                            title="Duplicate Row"
+                            onClick={() => addBlankRow(100)}
+                            className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition-all"
                           >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => deleteTransaction(tx.id)}
-                            className="p-1 rounded hover:bg-rose-100 text-rose-600"
-                            title="Delete Row"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add 100 Blank Rows</span>
                           </button>
                         </div>
-                      </td>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  displayedTransactions.map((tx, idx) => {
+                    const rowIndex = startIndex + idx;
+                    const isRowSelected = selectedCell?.rowId === tx.id;
 
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
+                    // Computed Target, Paid, and Balance for this row
+                    const annualTarget = (tx.annuallyAmount && tx.annuallyAmount > 0)
+                      ? tx.annuallyAmount
+                      : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
+                          ? tx.quarterlyAmount * 4
+                          : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount));
+                    
+                    const months = tx.monthsData || {};
+                    const totalRowPaid = Object.values(months).length > 0
+                      ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+                      : Number(tx.amount || 0);
 
-          </table>
+                    const balanceDue = Math.max(0, (annualTarget || 0) - totalRowPaid);
+                    const isFullyPaid = (annualTarget > 0 && totalRowPaid >= annualTarget) || (annualTarget === 0 && totalRowPaid > 0);
+
+                    return (
+                      <tr 
+                        key={tx.id}
+                        className={`hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors group ${
+                          isRowSelected ? 'bg-blue-50/30 dark:bg-slate-800/30' : ''
+                        }`}
+                      >
+                        {/* Row Number (1, 2, 3...) Sticky Left */}
+                        <td className={`w-12 p-2 text-center font-mono font-bold border-r border-slate-300 dark:border-slate-700 sticky left-0 z-10 select-none transition-colors ${
+                          selectedCell?.rowId === tx.id 
+                            ? 'bg-emerald-600 text-white font-black shadow-xs' 
+                            : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {rowIndex + 1}
+                        </td>
+
+                        {/* Column A: Receipt No */}
+                        <td 
+                          id={`cell-${tx.id}-receiptNo`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'receiptNo', 'A')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'receiptNo')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono font-bold text-blue-600 dark:text-blue-400 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'receiptNo' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'receiptNo' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'receiptNo', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'receiptNo', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate">{tx.receiptNo}</span>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleOpenVoucher(tx); }}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-blue-100 dark:hover:bg-slate-700 text-slate-500"
+                                title="Open Voucher"
+                              >
+                                <Receipt className="w-3 h-3 text-blue-500" />
+                              </button>
+                            </div>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'receiptNo' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column B: Date */}
+                        <td 
+                          id={`cell-${tx.id}-date`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'date', 'B')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'date')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono text-center cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'date' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'date' ? (
+                            <input
+                              type="date"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'date', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'date', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            tx.date
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'date' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column C: Donor Name */}
+                        <td 
+                          id={`cell-${tx.id}-donorName`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'C')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'donorName' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'donorName', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'donorName', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="font-semibold text-slate-800 dark:text-slate-100">
+                              {tx.donorName || tx.donorNameUrdu || '---'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column D: Branch Name */}
+                        <td 
+                          id={`cell-${tx.id}-branchName`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'branchName', 'D')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'branchName')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'branchName' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'branchName', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'branchName', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="text-slate-600 dark:text-slate-300 truncate block">{tx.branchName || '---'}</span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column E: Zila / District */}
+                        <td 
+                          id={`cell-${tx.id}-zila`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'zila', 'E')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'zila')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'zila' ? (
+                            <input
+                              type="text"
+                              list="pakistan-cities"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'zila', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'zila', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.zila || tx.city || '---'}</span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column F: Phone */}
+                        <td 
+                          id={`cell-${tx.id}-phone`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'F')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'phone')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'phone' ? (
+                            <input
+                              type="tel"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'phone', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'phone', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs font-mono"
+                            />
+                          ) : (
+                            tx.phone || '---'
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column G: Monthly Pledged */}
+                        <td 
+                          id={`cell-${tx.id}-monthlyAmount`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'G')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'monthlyAmount')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'monthlyAmount' ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'monthlyAmount', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'monthlyAmount', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                            />
+                          ) : (
+                            <span className="font-semibold text-blue-700 dark:text-blue-400">
+                              {tx.monthlyAmount && tx.monthlyAmount > 0 ? Number(tx.monthlyAmount).toLocaleString() : '—'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column H: Quarterly Pledged */}
+                        <td 
+                          id={`cell-${tx.id}-quarterlyAmount`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'H')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'quarterlyAmount')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'quarterlyAmount' ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'quarterlyAmount', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'quarterlyAmount', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                            />
+                          ) : (
+                            <span className="font-semibold text-indigo-700 dark:text-indigo-400">
+                              {tx.quarterlyAmount && tx.quarterlyAmount > 0 ? Number(tx.quarterlyAmount).toLocaleString() : '—'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column I: Annually Pledged */}
+                        <td 
+                          id={`cell-${tx.id}-annuallyAmount`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'I')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'annuallyAmount')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'annuallyAmount' ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'annuallyAmount', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'annuallyAmount', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                            />
+                          ) : (
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {tx.annuallyAmount && tx.annuallyAmount > 0 ? Number(tx.annuallyAmount).toLocaleString() : '—'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Columns J through U: 12 Months Breakdown */}
+                        {MONTH_KEYS.map((mKey, mIdx) => {
+                          const letter = String.fromCharCode(74 + mIdx); // 'J' to 'U'
+                          const mVal = tx.monthsData?.[mKey] || 0;
+                          const isFocused = focusedMonth === mKey;
+                          const isCellEditing = editingCell?.rowId === tx.id && editingCell.colKey === mKey;
+                          const isCellSelected = selectedCell?.rowId === tx.id && selectedCell.colKey === mKey;
+
+                          return (
+                            <td
+                              key={mKey}
+                              id={`cell-${tx.id}-${mKey}`}
+                              onClick={() => handleCellClick(tx.id, rowIndex, mKey as any, letter)}
+                              onDoubleClick={() => handleCellDoubleClick(tx.id, mKey as any)}
+                              className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none transition-colors ${
+                                isFocused ? 'bg-emerald-100/60 dark:bg-emerald-950/40' : ''
+                              } ${
+                                isCellSelected ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                              }`}
+                            >
+                              {isCellEditing ? (
+                                <input
+                                  type="number"
+                                  autoFocus
+                                  value={cellEditValue}
+                                  onChange={(e) => setCellEditValue(e.target.value)}
+                                  onBlur={() => handleCommitEdit(tx.id, mKey as any, cellEditValue)}
+                                  onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, mKey as any, idx, cellEditValue)}
+                                  className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                                />
+                              ) : (
+                                <span className={mVal > 0 ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}>
+                                  {mVal > 0 ? Number(mVal).toLocaleString() : '—'}
+                                </span>
+                              )}
+                              {isCellSelected && !isCellEditing && (
+                                <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Column V: Total Paid (Calculated) */}
+                        <td 
+                          id={`cell-${tx.id}-amount`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'V')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none bg-emerald-50/30 dark:bg-emerald-950/10 ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                            ₨ {Number(totalRowPaid).toLocaleString()}
+                          </span>
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column W: Balance Due (Calculated) */}
+                        <td 
+                          id={`cell-${tx.id}-balance`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'W')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {balanceDue <= 0 && isFullyPaid ? (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-black">
+                              ✓ Paid
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400 font-black">
+                              ₨ {Number(balanceDue).toLocaleString()}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column X: Payment Mode */}
+                        <td 
+                          id={`cell-${tx.id}-paymentMode`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'X')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-center relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          <select
+                            value={tx.paymentMode || 'Cash'}
+                            onChange={(e) => updateCell(tx.id, 'paymentMode', e.target.value as any)}
+                            className="w-full bg-transparent border-0 text-xs font-semibold focus:outline-none cursor-pointer text-center"
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="Online">Online Transfer</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="DD">Demand Draft (DD)</option>
+                          </select>
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column Y: Bank Name */}
+                        <td 
+                          id={`cell-${tx.id}-bankName`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'Y')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'bankName')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'bankName' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'bankName', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'bankName', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            tx.bankName || '---'
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column Z: Remarks / Notes */}
+                        <td 
+                          id={`cell-${tx.id}-notes`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'Z')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'notes')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'notes' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'notes', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'notes', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">{tx.notes || '---'}</span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="p-2 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Quick Pay Current Month */}
+                            <button
+                              onClick={() => handleQuickPayMonth(tx, focusedMonth || undefined)}
+                              className="p-1 px-1.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-0.5 shadow-2xs border border-emerald-300 dark:border-emerald-800"
+                              title={`Record pledge for ${focusedMonth ? MONTH_LABELS[focusedMonth].en : 'active month'}`}
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                              <span>Pay</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenVoucher(tx)}
+                              className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                              title="Print / View Voucher"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => duplicateTransaction(tx.id)}
+                              className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
+                              title="Duplicate Row"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteTransaction(tx.id)}
+                              className="p-1 rounded hover:bg-rose-100 text-rose-600"
+                              title="Delete Row"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+
+              {/* Sticky Grand Totals Table Footer */}
+              <tfoot className="sticky bottom-0 z-20 bg-slate-900 text-white font-mono font-bold text-xs border-t-2 border-slate-700 shadow-lg">
+                <tr>
+                  <td className="p-2.5 text-center bg-slate-950 border-r border-slate-800 sticky left-0 z-30">
+                    TOTAL
+                  </td>
+                  <td colSpan={6} className="p-2.5 border-r border-slate-800 text-slate-300 font-sans">
+                    Showing {displayedTransactions.length} of {filteredTransactions.length} members
+                  </td>
+                  {/* Col G: Monthly Commitments */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-blue-300">
+                    ₨ {summaryStats.monthlyCommitmentsSum.toLocaleString()}
+                  </td>
+                  {/* Col H: Quarterly Commitments */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-indigo-300">
+                    ₨ {summaryStats.quarterlyCommitmentsSum.toLocaleString()}
+                  </td>
+                  {/* Col I: Annually Commitments */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-white font-black">
+                    ₨ {summaryStats.annuallyCommitmentsSum.toLocaleString()}
+                  </td>
+                  {/* Cols J through U: 12 Month Totals */}
+                  {MONTH_KEYS.map((mKey) => (
+                    <td key={mKey} className="p-2 text-right border-r border-slate-800 text-emerald-400">
+                      {summaryStats.monthSums[mKey] > 0 ? `₨ ${(summaryStats.monthSums[mKey] / 1000).toFixed(summaryStats.monthSums[mKey] >= 10000 ? 0 : 1)}k` : '—'}
+                    </td>
+                  ))}
+                  {/* Col V: Total Collected */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-emerald-300 font-black">
+                    ₨ {summaryStats.totalPaid.toLocaleString()}
+                  </td>
+                  {/* Col W: Total Balance Due */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-amber-300 font-black">
+                    ₨ {summaryStats.totalBalance.toLocaleString()}
+                  </td>
+                  {/* Col X: Payment Mode Summary */}
+                  <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
+                    Cash: {Math.round((summaryStats.cashTotal / (summaryStats.totalPaid || 1)) * 100)}%
+                  </td>
+                  {/* Col Y: Bank Summary */}
+                  <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
+                    Bank: {Math.round((summaryStats.bankTotal / (summaryStats.totalPaid || 1)) * 100)}%
+                  </td>
+                  {/* Col Z & Actions */}
+                  <td colSpan={2} className="p-2 text-center text-emerald-400 font-sans text-xs">
+                    {summaryStats.collectionRate}% Realized
+                  </td>
+                </tr>
+              </tfoot>
+
+            </table>
+          </div>
 
           {/* GOOGLE SHEETS CLONE STYLE BOTTOM ROW CONTROLS (Template Mode) */}
           <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -1953,7 +2954,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   }`}
                 >
                   <FileSpreadsheet className={`w-3.5 h-3.5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                  <span>Sheet {sheetNum}</span>
+                  <span>{tab.name || `Sheet ${sheetNum}`}</span>
+                  {tab.cityName && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold">
+                      📍 {tab.cityName}
+                    </span>
+                  )}
                   {tab.periodType === 'raw' && (
                     <span className="text-[9px] px-1 rounded bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300">A-Z</span>
                   )}
@@ -2067,6 +3073,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>{sheet.name || `Sheet ${sheetNumber}`}</span>
+                {sheet.cityName && (
+                  <span className="text-[9px] px-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold">
+                    📍 {sheet.cityName}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -2080,62 +3091,108 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         </div>
       </div>
 
-      {/* NEW SHEET MODAL */}
+      {/* NEW SHEET MODAL (CITY-ENABLED) */}
       {isNewSheetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-900 dark:text-white">
-                Create New Sheet Tab
-              </h3>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  Create New City Sheet Tab
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Campaign: {currentProject?.name} ({currentProject?.year || 2026})
+                </p>
+              </div>
               <button onClick={() => setIsNewSheetModalOpen(false)}>
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSheetTab} className="space-y-3 text-xs sm:text-sm">
+            <form onSubmit={handleCreateSheetTab} className="space-y-3.5 text-xs sm:text-sm">
               <div>
-                <label className="block font-bold mb-1">
-                  Sheet Name
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  City Name / شہر کا نام (Punjab District / Branch)
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-amber-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    list="pakistan-cities"
+                    value={newSheetCity}
+                    onChange={(e) => {
+                      setNewSheetCity(e.target.value);
+                      if (!newSheetName) {
+                        setNewSheetName(`${e.target.value} Worksheet`);
+                      }
+                    }}
+                    placeholder="e.g. Lahore, Faisalabad, Rawalpindi, Multan..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    autoFocus
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5 block">Select or type any city/district in Punjab</span>
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  Sheet Display Name
                 </label>
                 <input
                   type="text"
                   value={newSheetName}
                   onChange={(e) => setNewSheetName(e.target.value)}
                   placeholder={`Sheet ${sheetTabs.length + 1}`}
-                  className="w-full p-2.5 rounded-xl border"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">
-                  Optional Category Filter
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  Sheet Format
                 </label>
-                <select
-                  value={newSheetCategory}
-                  onChange={(e) => setNewSheetCategory(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border"
-                >
-                  <option value="">No Filter (All Entries)</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.nameEnglish}</option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewSheetFormat('template')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all ${
+                      newSheetFormat === 'template'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-extrabold">9-Column Ledger</div>
+                    <div className="text-[10px] text-slate-500 font-normal">Pre-configured with receipt, donor, amounts</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewSheetFormat('raw')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all ${
+                      newSheetFormat === 'raw'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-500'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-extrabold">Raw Grid (A-Z)</div>
+                    <div className="text-[10px] text-slate-500 font-normal">Freeform Excel spreadsheet grid</div>
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setIsNewSheetModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border text-slate-600"
+                  className="px-4 py-2 rounded-xl border text-slate-600 dark:text-slate-300 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold cursor-pointer shadow-sm"
                 >
-                  Add Sheet
+                  Create Sheet
                 </button>
               </div>
             </form>
@@ -2143,7 +3200,281 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         </div>
       )}
 
-      {/* Toast Notification when shareable link is copied */}
+      {/* NEW PROJECT & YEAR MODAL */}
+      {isNewProjectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full border-2 border-amber-400 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-arabic text-amber-600 font-bold text-xs">جماعت اصلاح المسلمین پنجاب</span>
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  Create New Project / Campaign
+                </h3>
+              </div>
+              <button onClick={() => setIsNewProjectModalOpen(false)}>
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="space-y-3.5 text-xs sm:text-sm">
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="e.g. JIM Punjab Annual Campaign 2026"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  Campaign Year (سال)
+                </label>
+                <input
+                  type="text"
+                  value={newProjectYear}
+                  onChange={(e) => setNewProjectYear(e.target.value)}
+                  placeholder="2026"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">Enter campaign fiscal year (defaults to 2026)</span>
+              </div>
+
+              <div>
+                <label className="block font-bold mb-1 text-slate-700 dark:text-slate-200">
+                  Description / Purpose (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newProjectDesc}
+                  onChange={(e) => setNewProjectDesc(e.target.value)}
+                  placeholder="e.g. Punjab provincial district membership drive"
+                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsNewProjectModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer shadow-sm"
+                >
+                  Create Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BATCH MULTI-SHEET CREATOR MODAL (SAVE DIRECTLY TO CLOUD DATABASE) */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-lg w-full border-2 border-amber-400 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-arabic text-amber-600 dark:text-amber-400 font-bold text-sm">جماعت اصلاح المسلمین پنجاب</span>
+                  <span className="text-amber-500 text-xs">✦</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-300">
+                    PostgreSQL Synced
+                  </span>
+                </div>
+                <h3 className="font-black text-slate-900 dark:text-white text-lg mt-0.5">
+                  Multi-Sheet Creator & Cloud Database Sync
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Select how many sheets you need. All sheets will be created and saved <strong className="text-emerald-700 dark:text-emerald-400">directly into the Neon PostgreSQL cloud database</strong> (not local storage).
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsBatchModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBatchSaveToDatabase} className="space-y-4 text-xs sm:text-sm">
+              
+              {/* 1. How Many Sheets Do You Need? */}
+              <div>
+                <label className="block font-black text-slate-900 dark:text-white mb-1.5">
+                  How many sheets do you need? (کتنی شیٹس درکار ہیں؟)
+                </label>
+                
+                {/* Quick Selection Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                  {[1, 3, 5, 10, 15, 20, 25, 30].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setBatchCount(num)}
+                      className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                        batchCount === num
+                          ? 'bg-amber-500 text-slate-950 shadow-sm ring-2 ring-amber-400/50 scale-105'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {num} {num === 1 ? 'Sheet' : 'Sheets'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={batchCount}
+                    onChange={(e) => setBatchCount(Math.min(50, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                    className="w-28 p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-black text-base focus:outline-none focus:ring-2 focus:ring-amber-500 text-center"
+                  />
+                  <span className="text-xs text-slate-500">
+                    Max 50 sheets in one batch (pre-assigned with unique database IDs).
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. Format Selection */}
+              <div>
+                <label className="block font-black text-slate-900 dark:text-white mb-1.5">
+                  Sheet Format / ترتیب
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setBatchFormat('template')}
+                    className={`p-3 rounded-2xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                      batchFormat === 'template'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="font-black text-sm">9-Column Ledger</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Receipt, Donor, City, Periodic amounts, Fund Category
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBatchFormat('raw')}
+                    className={`p-3 rounded-2xl border text-xs font-bold text-left transition-all cursor-pointer ${
+                      batchFormat === 'raw'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="font-black text-sm">Excel Grid (A-Z)</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Full freeform multi-column spreadsheet grid
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Punjab Cities Assignment */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-amber-950 dark:text-amber-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={batchAutoCities}
+                      onChange={(e) => setBatchAutoCities(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Auto-assign Punjab Cities to each sheet</span>
+                  </label>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-400 font-mono">
+                    {batchCount} cities
+                  </span>
+                </div>
+
+                {batchAutoCities ? (
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 flex flex-wrap gap-1 pt-1">
+                    {PUNJAB_CITIES_PRESET.slice(0, batchCount).map((city, idx) => (
+                      <span key={city} className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-amber-300 text-amber-900 dark:text-amber-200 font-bold">
+                        {idx + 1}. {city}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pt-1">
+                    <textarea
+                      rows={2}
+                      value={batchCustomCities}
+                      onChange={(e) => setBatchCustomCities(e.target.value)}
+                      placeholder="Enter city names separated by commas (e.g. Lahore, Faisalabad, Multan...)"
+                      className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Database Storage Assurance Box */}
+              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs">
+                <Database className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="text-[11px] font-medium leading-tight">
+                  <strong>Strict Database Storage:</strong> Sheets are saved directly into the <code>sheet_tabs</code> table in Neon PostgreSQL. They will persist across devices, browsers, and remote viewers.
+                </span>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsBatchModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingToDb}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-white font-black text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <Database className="w-4 h-4 text-emerald-300" />
+                  <span>
+                    {isSavingToDb ? 'Saving to Database...' : `Save ${batchCount} Sheets to Database`}
+                  </span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Database Save Success Notification Toast */}
+      {dbSaveSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-emerald-400 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-400/40">
+            <Check className="w-5 h-5 stroke-[3]" />
+          </div>
+          <div>
+            <div className="font-black text-white text-sm">Saved to Neon PostgreSQL Database!</div>
+            <div className="text-emerald-200 text-xs mt-0.5">
+              {dbSaveSuccessMsg}
+            </div>
+          </div>
+        </div>
+      )}
       {isLinkCopied && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2">
           <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
@@ -2162,27 +3493,72 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       <GeminiReceiptScannerModal
         isOpen={isGeminiScannerOpen}
         onClose={() => setIsGeminiScannerOpen(false)}
+        onSuccess={(targetId) => {
+          const effectiveSheetId = targetId || activeSheetTabId;
+          if (targetId && targetId !== activeSheetTabId) {
+            setActiveSheetTabId(targetId);
+          }
+          try {
+            const savedGrid = localStorage.getItem(`jamia_raw_grid_${effectiveSheetId}`);
+            if (savedGrid) {
+              setRawGridData(JSON.parse(savedGrid));
+            }
+          } catch (e) {
+            console.error(e);
+          }
+          setSearchQuery('');
+          setSelectedZila('all');
+          setSelectedBranch('all');
+          setSelectedAccountingStatus('all');
+          setSelectedPaymentMode('all');
+          setSelectedType('all');
+          setCurrentPage(1);
+        }}
       />
 
-      {/* Autocomplete Datalist for Pakistan Cities */}
+      {/* Autocomplete Datalist for Pakistan & Punjab Cities */}
       <datalist id="pakistan-cities">
-        <option value="Karachi" />
         <option value="Lahore" />
-        <option value="Islamabad" />
-        <option value="Rawalpindi" />
         <option value="Faisalabad" />
-        <option value="Multan" />
-        <option value="Hyderabad" />
-        <option value="Peshawar" />
-        <option value="Quetta" />
+        <option value="Rawalpindi" />
         <option value="Gujranwala" />
-        <option value="Sialkot" />
-        <option value="Sukkur" />
-        <option value="Larkana" />
-        <option value="Kandiaro" />
-        <option value="Naushahro Feroze" />
+        <option value="Multan" />
         <option value="Bahawalpur" />
         <option value="Sargodha" />
+        <option value="Sialkot" />
+        <option value="Sheikhupura" />
+        <option value="Rahim Yar Khan" />
+        <option value="Jhang" />
+        <option value="Dera Ghazi Khan" />
+        <option value="Gujrat" />
+        <option value="Sahiwal" />
+        <option value="Wah Cantt" />
+        <option value="Kasur" />
+        <option value="Okara" />
+        <option value="Mianwali" />
+        <option value="Chiniot" />
+        <option value="Kamoke" />
+        <option value="Hafizabad" />
+        <option value="Sadiqabad" />
+        <option value="Burewala" />
+        <option value="Khanewal" />
+        <option value="Muzaffargarh" />
+        <option value="Mandi Bahauddin" />
+        <option value="Jhelum" />
+        <option value="Khanpur" />
+        <option value="Chakwal" />
+        <option value="Khushab" />
+        <option value="Bahawalnagar" />
+        <option value="Vehari" />
+        <option value="Pakpattan" />
+        <option value="Toba Tek Singh" />
+        <option value="Attock" />
+        <option value="Lodhran" />
+        <option value="Bhakkar" />
+        <option value="Islamabad" />
+        <option value="Karachi" />
+        <option value="Peshawar" />
+        <option value="Quetta" />
       </datalist>
 
     </div>

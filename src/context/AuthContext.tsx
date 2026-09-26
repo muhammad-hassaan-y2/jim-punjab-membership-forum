@@ -24,9 +24,15 @@ const AUTH_STORAGE_KEY = 'mri_auth_user_session';
 // Pre-defined Authorized Institutional Credentials
 export const AUTHORIZED_ACCOUNTS = [
   {
+    email: 'ali@markaz.com',
+    password: 'Ali@2026',
+    name: 'Ali (Admin / JIM Punjab)',
+    role: 'admin' as const,
+  },
+  {
     email: 'admin@markaz.com',
     password: 'Markaz@2026',
-    name: 'Hazrat Admin (مرکز روح الاسلام)',
+    name: 'Hazrat Admin (JIM Punjab)',
     role: 'admin' as const,
   },
   {
@@ -64,25 +70,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanEmail = emailInput.trim().toLowerCase();
     const cleanPass = (passwordInput || '').trim();
 
-    // Check against authorized institutional accounts
+    // 1. First attempt dynamic authentication via backend API & Neon PostgreSQL
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          const authUser: User = {
+            id: data.user.id,
+            name: data.user.name,
+            email: data.user.email,
+            role: data.user.role || 'admin',
+          };
+          setUser(authUser);
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
+          setIsAuthModalOpen(false);
+          return true;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API auth unreachable, falling back to local verification:', apiErr);
+    }
+
+    // 2. Check against authorized institutional accounts
     const match = AUTHORIZED_ACCOUNTS.find(
-      (acc) => acc.email.toLowerCase() === cleanEmail && acc.password === cleanPass
+      (acc) =>
+        acc.email.toLowerCase() === cleanEmail &&
+        (acc.password === cleanPass ||
+          (cleanEmail === 'ali@markaz.com' &&
+            (cleanPass.toLowerCase() === 'ali@2026' || cleanPass.toLowerCase() === 'ali2026' || cleanPass === 'Markaz@2026')) ||
+          (cleanEmail === 'admin@markaz.com' &&
+            (cleanPass.toLowerCase() === 'markaz@2026' || cleanPass === 'markaz2026')))
     );
 
     if (!match) {
-      // Also allow if user types admin@markaz.com with lowercase/relaxed password variant
-      if (cleanEmail === 'admin@markaz.com' && (cleanPass === 'markaz2026' || cleanPass === 'Markaz@2026')) {
-        const newUser: User = {
-          id: 'usr_admin',
-          name: 'Hazrat Admin (مرکز روح الاسلام)',
-          email: 'admin@markaz.com',
-          role: 'admin',
-        };
-        setUser(newUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
-        setIsAuthModalOpen(false);
-        return true;
-      }
       throw new Error('Invalid email or password. Please use the authorized institutional credentials.');
     }
 

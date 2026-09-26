@@ -61,8 +61,8 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  const handleCopyCredentials = () => {
-    navigator.clipboard.writeText('Email: admin@markaz.com\nPassword: Markaz@2026');
+  const handleCopyCredentials = (emailStr = 'ali@markaz.com', passStr = 'Ali@2026') => {
+    navigator.clipboard.writeText(`Email: ${emailStr}\nPassword: ${passStr}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -90,42 +90,54 @@ export const AuthModal: React.FC = () => {
           </div>
 
           <div className="font-arabic text-lg font-bold text-amber-300">
-            مرکز روح الاسلام
+            جماعت اصلاح المسلمین پنجاب
           </div>
           <h2 className="text-xl font-black tracking-tight text-white mt-0.5">
-            Institutional Sign In
+            JIM Punjab Membership Forum
           </h2>
           <p className="text-xs text-emerald-200/90 font-medium mt-1">
-            Markaz Rooh ul Islam &bull; Financial Portal Security
+            Institutional Accounting &bull; Secure User Authentication
           </p>
         </div>
 
         {/* Official Credentials Quick Panel */}
-        <div className="bg-amber-950/20 border-b border-amber-300/40 px-5 py-3 flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <div className="truncate">
-              <span className="text-emerald-950 font-bold block text-[11px]">Credentials:</span>
-              <span className="text-slate-600 font-mono text-[10px]">admin@markaz.com &bull; Markaz@2026</span>
+        <div className="bg-amber-950/20 border-b border-amber-300/40 px-5 py-3 space-y-1.5 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <div className="truncate">
+                <span className="text-emerald-950 font-bold block text-[11px]">User Account (Ali):</span>
+                <span className="text-slate-600 font-mono text-[10px]">ali@markaz.com &bull; Ali@2026</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleCopyCredentials('ali@markaz.com', 'Ali@2026')}
+                className="px-2 py-1 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300/80 flex items-center gap-1 cursor-pointer transition-colors"
+                title="Copy credentials"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutoFillAndLogin('ali@markaz.com', 'Ali@2026')}
+                className="px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 text-[10px] font-black shadow-xs hover:from-amber-300 hover:to-amber-400 flex items-center gap-1 cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-950" />
+                <span>1-Click</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleCopyCredentials}
-              className="px-2 py-1 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-bold border border-amber-300/80 flex items-center gap-1 cursor-pointer transition-colors"
-              title="Copy credentials"
-            >
-              {copied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
+          <div className="text-[10px] text-slate-500 flex justify-between pt-1 border-t border-amber-200/50">
+            <span>Admin fallback: <span className="font-mono text-slate-700">admin@markaz.com</span></span>
             <button
               type="button"
               onClick={() => handleAutoFillAndLogin('admin@markaz.com', 'Markaz@2026')}
-              className="px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 text-[10px] font-black shadow-xs hover:from-amber-300 hover:to-amber-400 flex items-center gap-1 cursor-pointer"
+              className="text-amber-800 hover:underline font-bold cursor-pointer"
             >
-              <Sparkles className="w-3 h-3 text-emerald-950" />
-              <span>1-Click</span>
+              Sign in as Admin &rarr;
             </button>
           </div>
         </div>
@@ -151,7 +163,7 @@ export const AuthModal: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@markaz.com"
+                placeholder="ali@markaz.com"
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-amber-300/80 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:border-transparent transition-all shadow-2xs"
               />
             </div>

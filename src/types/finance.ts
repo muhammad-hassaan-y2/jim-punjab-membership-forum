@@ -24,25 +24,60 @@ export interface BankAccount {
   branch: string;
 }
 
+export interface MonthlyContributions {
+  jan?: number;
+  feb?: number;
+  mar?: number;
+  apr?: number;
+  may?: number;
+  jun?: number;
+  jul?: number;
+  aug?: number;
+  sep?: number;
+  oct?: number;
+  nov?: number;
+  dec?: number;
+}
+
+export const MONTH_KEYS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
+export type MonthKey = typeof MONTH_KEYS[number];
+export const MONTH_LABELS: Record<MonthKey, { en: string; ur: string }> = {
+  jan: { en: 'Jan', ur: 'جنوری' },
+  feb: { en: 'Feb', ur: 'فروری' },
+  mar: { en: 'Mar', ur: 'مارچ' },
+  apr: { en: 'Apr', ur: 'اپریل' },
+  may: { en: 'May', ur: 'مئی' },
+  jun: { en: 'Jun', ur: 'جون' },
+  jul: { en: 'Jul', ur: 'جولائی' },
+  aug: { en: 'Aug', ur: 'اگست' },
+  sep: { en: 'Sep', ur: 'ستمبر' },
+  oct: { en: 'Oct', ur: 'اکتوبر' },
+  nov: { en: 'Nov', ur: 'نومبر' },
+  dec: { en: 'Dec', ur: 'دسمبر' },
+};
+
 export interface Transaction {
   id: string;
   receiptNo: string;
   date: string; // ISO format: YYYY-MM-DD
-  donorName: string; // اسم گرامی
+  donorName: string; // اسم گرامی / نام دہندہ
   donorNameUrdu?: string;
-  phone: string;
+  branchName?: string; // برانچ کا نام / شاخ
+  zila?: string; // ضلع / District
+  phone: string; // فون نمبر
   address: string; // مکمل پتہ
   city?: string; // شہر
   reference?: string; // بتوسط (legacy/optional)
   preferredPeriod?: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually';
-  monthlyAmount?: number;
-  quarterlyAmount?: number;
-  halfYearlyAmount?: number;
-  annuallyAmount?: number;
-  amount: number; // کل رقم (Total Amount as Period)
+  monthlyAmount?: number; // ماہانہ رقم
+  quarterlyAmount?: number; // سہ ماہی رقم
+  halfYearlyAmount?: number; // شش ماہی رقم
+  annuallyAmount?: number; // سالانہ رقم
+  monthsData?: MonthlyContributions; // 12-Month Contribution breakdown
+  amount: number; // کل وصول شدہ رقم (Total Paid / Collected Amount)
   amountInWordsUrdu?: string;
   amountInWordsEnglish?: string;
-  categoryId: string; // category key
+  categoryId?: string; // category key (defaults to membership)
   categoryName?: string;
   categoryNameUrdu?: string;
   paymentMode: PaymentMethod;
@@ -55,10 +90,23 @@ export interface Transaction {
   customFields?: Record<string, any>;
 }
 
+export interface FinancialProject {
+  id: string;
+  name: string;
+  year: number | string; // e.g. 2026
+  description?: string;
+  targetAmount?: number;
+  createdAt: string;
+}
+
 export interface SheetTab {
   id: string;
   name: string;
   nameUrdu: string;
+  projectId?: string;
+  projectName?: string;
+  projectYear?: number | string;
+  cityName?: string;
   categoryFilter?: string;
   typeFilter?: TransactionType | 'all';
   color?: string;
@@ -84,6 +132,7 @@ export interface OrganizationConfig {
   currencySymbolUrdu: string;
   receiptPrefix: string;
   receiptCounter: number;
+  targetCollectionAmount?: number;
   signatoryName: string;
   signatoryTitle: string;
   stampOfficeText: string;

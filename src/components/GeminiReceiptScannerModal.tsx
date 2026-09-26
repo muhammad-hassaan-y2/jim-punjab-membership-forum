@@ -28,12 +28,20 @@ import {
   ArrowRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Transaction } from '../types/finance';
+import { Transaction, MonthlyContributions, MONTH_KEYS, MonthKey } from '../types/finance';
+
+function cleanAmount(val: any): number {
+  if (typeof val === 'number') return isNaN(val) ? 0 : Math.abs(val);
+  if (!val) return 0;
+  const s = String(val).replace(/,/g, '').replace(/[^0-9.]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
 
 interface GeminiReceiptScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (targetSheetId: string) => void;
 }
 
 interface ExtractedEntry {
@@ -41,6 +49,8 @@ interface ExtractedEntry {
   date: string;
   donorName: string;
   donorNameUrdu?: string | null;
+  branchName: string;
+  zila: string;
   phone: string;
   address: string;
   city: string;
@@ -49,6 +59,7 @@ interface ExtractedEntry {
   quarterlyAmount: number;
   halfYearlyAmount: number;
   annuallyAmount: number;
+  targetMonth?: string | null;
   amount: number;
   paymentMode: 'Cash' | 'Cheque' | 'Online' | 'DD';
   bankName: string;
@@ -190,29 +201,38 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
           if (found) matchedCat = found.id;
         }
 
-        const amt = Number(raw.amount) || 0;
+        const amt = cleanAmount(raw.amount);
         const period: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually' = 
           ['Monthly', 'Quarterly', 'Half Yearly', 'Annually'].includes(raw.preferredPeriod)
             ? raw.preferredPeriod
             : 'Monthly';
+
+        const monthlyAmt = cleanAmount(raw.monthlyAmount) || (period === 'Monthly' ? amt : 0);
+        const quarterlyAmt = cleanAmount(raw.quarterlyAmount) || (period === 'Quarterly' ? amt : 0);
+        const halfYearlyAmt = cleanAmount(raw.halfYearlyAmount) || (period === 'Half Yearly' ? amt : 0);
+        const annuallyAmt = cleanAmount(raw.annuallyAmount) || (period === 'Annually' ? amt : 0);
+        const finalAmt = amt || monthlyAmt || quarterlyAmt || halfYearlyAmt || annuallyAmt || 0;
 
         return {
           receiptNo: raw.receiptNo ? String(raw.receiptNo) : '',
           date: raw.date || new Date().toISOString().split('T')[0],
           donorName: raw.donorName || `Donor #${idx + 1}`,
           donorNameUrdu: raw.donorNameUrdu || null,
+          branchName: raw.branchName || 'Main Branch',
+          zila: raw.zila || raw.city || 'Lahore',
           phone: raw.phone || '',
           address: raw.address || '',
-          city: raw.city || 'Karachi',
+          city: raw.city || 'Lahore',
           preferredPeriod: period,
-          monthlyAmount: raw.monthlyAmount || (period === 'Monthly' ? amt : 0),
-          quarterlyAmount: raw.quarterlyAmount || (period === 'Quarterly' ? amt : 0),
-          halfYearlyAmount: raw.halfYearlyAmount || (period === 'Half Yearly' ? amt : 0),
-          annuallyAmount: raw.annuallyAmount || (period === 'Annually' ? amt : 0),
-          amount: amt,
+          monthlyAmount: monthlyAmt,
+          quarterlyAmount: quarterlyAmt,
+          halfYearlyAmount: halfYearlyAmt,
+          annuallyAmount: annuallyAmt,
+          targetMonth: raw.targetMonth || null,
+          amount: finalAmt,
           paymentMode: ['Cash', 'Cheque', 'Online', 'DD'].includes(raw.paymentMode) ? raw.paymentMode : 'Cash',
           bankName: raw.bankName || '',
-          categoryId: matchedCat,
+          categoryId: 'membership',
           notes: raw.notes || 'Verified from document via Gemini AI',
         };
       });
@@ -229,18 +249,21 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
         receiptNo: generateNextReceiptNumber(),
         date: new Date().toISOString().split('T')[0],
         donorName: 'Generous Contributor (خیر خواہ)',
+        branchName: 'Main Branch',
+        zila: 'Lahore',
         phone: '',
         address: '',
-        city: 'Karachi',
+        city: 'Lahore',
         preferredPeriod: 'Monthly',
         monthlyAmount: 0,
         quarterlyAmount: 0,
         halfYearlyAmount: 0,
         annuallyAmount: 0,
+        targetMonth: null,
         amount: 0,
         paymentMode: 'Cash',
         bankName: '',
-        categoryId: categories[0]?.id || 'general',
+        categoryId: 'membership',
         notes: 'Document manual entry fallback',
       }]);
       setActiveEntryIndex(0);
@@ -333,7 +356,8 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
         cur.halfYearlyAmount = value === 'Half Yearly' ? cur.amount : 0;
         cur.annuallyAmount = value === 'Annually' ? cur.amount : 0;
       } else if (field === 'amount') {
-        const val = Number(value) || 0;
+        const val = cleanAmount(value);
+        cur.amount = val;
         if (cur.preferredPeriod === 'Monthly') cur.monthlyAmount = val;
         if (cur.preferredPeriod === 'Quarterly') cur.quarterlyAmount = val;
         if (cur.preferredPeriod === 'Half Yearly') cur.halfYearlyAmount = val;
@@ -371,12 +395,34 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
           ? entry.receiptNo 
           : String(startSeq + i);
 
+        // Determine month key based on targetMonth or receipt date
+        let monthKey: MonthKey = 'jan';
+        if (entry.targetMonth && MONTH_KEYS.includes(entry.targetMonth as any)) {
+          monthKey = entry.targetMonth as MonthKey;
+        } else if (entry.date) {
+          const parsedM = new Date(entry.date).getMonth();
+          if (!isNaN(parsedM) && MONTH_KEYS[parsedM]) {
+            monthKey = MONTH_KEYS[parsedM];
+          }
+        }
+
+        const initialMonthsData: MonthlyContributions = {
+          jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+          jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0,
+          [monthKey]: Number(entry.amount) || 0,
+        };
+
+        const targetBranch = entry.branchName || currentTargetSheet?.name || 'Main Branch';
+        const targetZila = entry.zila || entry.city || currentTargetSheet?.cityName || 'Lahore';
+
         // Add to FinanceContext (Neon DB & template state)
         await addTransaction({
           receiptNo: assignedReceiptNo,
           date: entry.date,
           donorName: entry.donorName,
           donorNameUrdu: entry.donorNameUrdu || undefined,
+          branchName: targetBranch,
+          zila: targetZila,
           phone: entry.phone,
           address: entry.address,
           city: entry.city,
@@ -385,8 +431,9 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
           quarterlyAmount: entry.quarterlyAmount,
           halfYearlyAmount: entry.halfYearlyAmount,
           annuallyAmount: entry.annuallyAmount,
+          monthsData: initialMonthsData,
           amount: Number(entry.amount) || 0,
-          categoryId: entry.categoryId,
+          categoryId: 'membership',
           paymentMode: entry.paymentMode,
           bankName: entry.bankName,
           chequeOrTxnNo: `AI-${Date.now().toString().slice(-4)}-${i + 1}`,
@@ -406,18 +453,17 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
             'A': assignedReceiptNo,
             'B': entry.date,
             'C': entry.donorName,
-            'D': entry.address,
-            'E': entry.city,
-            'F': entry.monthlyAmount ? String(entry.monthlyAmount) : '',
-            'G': entry.quarterlyAmount ? String(entry.quarterlyAmount) : '',
-            'H': entry.halfYearlyAmount ? String(entry.halfYearlyAmount) : '',
+            'D': targetBranch,
+            'E': targetZila,
+            'F': entry.phone,
+            'G': entry.monthlyAmount ? String(entry.monthlyAmount) : '',
+            'H': entry.quarterlyAmount ? String(entry.quarterlyAmount) : '',
             'I': entry.annuallyAmount ? String(entry.annuallyAmount) : '',
-            'J': String(entry.amount),
-            'K': entry.paymentMode,
-            'L': entry.bankName,
-            'M': entry.phone,
-            'N': entry.categoryId,
-            'O': entry.notes,
+            'V': String(entry.amount),
+            'W': '0',
+            'X': entry.paymentMode,
+            'Y': entry.bankName,
+            'Z': entry.notes,
           };
           localStorage.setItem(gridKey, JSON.stringify(currentRaw));
         } catch (e) {
@@ -438,7 +484,7 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
 
       setStep('success');
       setTimeout(() => {
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(targetSheetId);
         onClose();
       }, 1500);
     } catch (err: any) {
@@ -846,21 +892,48 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </datalist>
                     </div>
 
-                    {/* Preferred Period */}
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Preferred Period (مدت / میعاد)
+                    {/* Preferred Period with Tick (✓) & Cross (✗) Only */}
+                    <div className="sm:col-span-2">
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Preferred Period (مدت / میعاد — ٹک ✓ اور کراس ✗)</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Click to tick (✓), others automatically become cross (✗)</span>
                       </label>
-                      <select
-                        value={currentEntry.preferredPeriod}
-                        onChange={(e) => updateCurrentEntry('preferredPeriod', e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                      >
-                        <option value="Monthly">Monthly (ماہانہ)</option>
-                        <option value="Quarterly">Quarterly (سہ ماہی)</option>
-                        <option value="Half Yearly">Half Yearly (شش ماہی)</option>
-                        <option value="Annually">Annually (سالانہ)</option>
-                      </select>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { key: 'Monthly', titleEn: 'Monthly', titleUr: 'ماہانہ' },
+                          { key: 'Quarterly', titleEn: 'Quarterly', titleUr: 'سہ ماہی' },
+                          { key: 'Half Yearly', titleEn: 'Half Yearly', titleUr: 'شش ماہی' },
+                          { key: 'Annually', titleEn: 'Annually', titleUr: 'سالانہ' },
+                        ].map((p) => {
+                          const isTicked = currentEntry.preferredPeriod === p.key;
+                          return (
+                            <button
+                              key={p.key}
+                              type="button"
+                              onClick={() => updateCurrentEntry('preferredPeriod', p.key)}
+                              className={`p-2.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                                isTicked
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-900 dark:text-emerald-100 shadow-xs ring-2 ring-emerald-500/40'
+                                  : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                            >
+                              <div className="text-left">
+                                <div className="font-extrabold text-xs">{p.titleEn}</div>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-urdu">{p.titleUr}</div>
+                              </div>
+                              <span
+                                className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-xs font-black shrink-0 ${
+                                  isTicked
+                                    ? 'bg-emerald-600 text-white shadow-xs'
+                                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-500 border border-rose-200 dark:border-rose-900/60'
+                                }`}
+                              >
+                                {isTicked ? '✓' : '✗'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Total Amount as Period */}
@@ -922,22 +995,33 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       />
                     </div>
 
-                    {/* Fund Category */}
+                    {/* Branch Name */}
                     <div>
                       <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Fund Category (مد / کھاتہ)
+                        Branch Name (شاخ / برانچ)
                       </label>
-                      <select
-                        value={currentEntry.categoryId}
-                        onChange={(e) => updateCurrentEntry('categoryId', e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                      >
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nameEnglish} ({c.nameUrdu})
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        value={currentEntry.branchName}
+                        onChange={(e) => updateCurrentEntry('branchName', e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g. Main Branch, Lahore"
+                      />
+                    </div>
+
+                    {/* Zila / District */}
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Zila / District (ضلع)
+                      </label>
+                      <input
+                        type="text"
+                        list="modal-pakistan-cities"
+                        value={currentEntry.zila}
+                        onChange={(e) => updateCurrentEntry('zila', e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="e.g. Lahore, Faisalabad"
+                      />
                     </div>
 
                     {/* Notes / Remarks */}

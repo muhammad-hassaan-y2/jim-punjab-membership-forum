@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_idsJ61UrVmOf@ep-dawn-morning-b55o6qom-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_Q4GTJ3Bqurap@ep-rapid-flower-b43ib5x8-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 export const sql = neon(connectionString);
 
@@ -40,12 +40,24 @@ export async function initDatabase() {
       )
     `;
 
+    // Ensure columns exist on transactions table
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS branch_name VARCHAR(255)`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS zila VARCHAR(255)`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(15, 2) DEFAULT 0`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS quarterly_amount NUMERIC(15, 2) DEFAULT 0`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS annually_amount NUMERIC(15, 2) DEFAULT 0`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS months_data JSONB DEFAULT '{}'`;
+
     // 2. Sheet Tabs table
     await sql`
       CREATE TABLE IF NOT EXISTS sheet_tabs (
         id VARCHAR(100) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         name_urdu VARCHAR(255),
+        project_id VARCHAR(100),
+        project_name VARCHAR(255),
+        project_year VARCHAR(50),
+        city_name VARCHAR(100),
         category_filter VARCHAR(100),
         type_filter VARCHAR(50),
         color VARCHAR(50),
@@ -55,6 +67,12 @@ export async function initDatabase() {
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `;
+
+    // Ensure columns exist on existing table
+    await sql`ALTER TABLE sheet_tabs ADD COLUMN IF NOT EXISTS project_id VARCHAR(100)`;
+    await sql`ALTER TABLE sheet_tabs ADD COLUMN IF NOT EXISTS project_name VARCHAR(255)`;
+    await sql`ALTER TABLE sheet_tabs ADD COLUMN IF NOT EXISTS project_year VARCHAR(50)`;
+    await sql`ALTER TABLE sheet_tabs ADD COLUMN IF NOT EXISTS city_name VARCHAR(100)`;
 
     // 3. Categories table
     await sql`
@@ -89,6 +107,27 @@ export async function initDatabase() {
         row_count INT DEFAULT 100,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
+    `;
+
+    // 6. Users table for authentication
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'admin',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // Ensure ali@markaz.com and admin@markaz.com are seeded
+    await sql`
+      INSERT INTO users (id, name, email, password, role)
+      VALUES 
+        ('usr_ali', 'Ali', 'ali@markaz.com', 'Ali@2026', 'admin'),
+        ('usr_admin', 'Admin (JIM Punjab)', 'admin@markaz.com', 'Markaz@2026', 'admin')
+      ON CONFLICT (email) DO NOTHING
     `;
 
     tablesInitialized = true;

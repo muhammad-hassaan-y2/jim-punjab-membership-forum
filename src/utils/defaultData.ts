@@ -32,80 +32,33 @@ export const defaultBankAccounts: BankAccount[] = [
 
 export const defaultCategories: FundCategory[] = [
   {
-    id: 'zakat',
-    nameEnglish: 'Zakat',
-    nameUrdu: 'زکوٰۃ',
-    color: '#059669', // emerald
-    type: 'income',
-    isDefault: true,
-  },
-  {
-    id: 'fitrat',
-    nameEnglish: 'Fitrat',
-    nameUrdu: 'فطرت / فطرانہ',
-    color: '#0284c7', // sky
-    type: 'income',
-    isDefault: true,
-  },
-  {
-    id: 'sadqat',
-    nameEnglish: 'Sadqat',
-    nameUrdu: 'صدقات',
-    color: '#d97706', // amber
-    type: 'income',
-    isDefault: true,
-  },
-  {
-    id: 'khirat',
-    nameEnglish: 'Khirat',
-    nameUrdu: 'خیرات',
-    color: '#7c3aed', // violet
-    type: 'income',
-    isDefault: true,
-  },
-  {
-    id: 'charam_qurbani',
-    nameEnglish: 'Charam Qurbani',
-    nameUrdu: 'چرم قربانی',
-    color: '#dc2626', // red
-    type: 'income',
-    isDefault: true,
-  },
-  {
     id: 'membership',
-    nameEnglish: 'Membership',
-    nameUrdu: 'ممبر شپ',
-    color: '#2563eb', // blue
-    type: 'income',
-    isDefault: true,
-  },
-  {
-    id: 'madrassah',
-    nameEnglish: 'Madrassah',
-    nameUrdu: 'مدرسہ',
-    color: '#0d9488', // teal
+    nameEnglish: 'Membership Fund',
+    nameUrdu: 'ممبر شپ فنڈ',
+    color: '#059669', // emerald
     type: 'income',
     isDefault: true,
   },
 ];
 
 export const defaultOrgConfig: OrganizationConfig = {
-  nameEnglish: 'Markaz Rooh ul Islam',
-  nameUrdu: 'مرکز روح الاسلام',
-  subHeaderEnglish: 'Islamic Research, Educational & Welfare Foundation',
-  subHeaderUrdu: 'اسلامی تعلیمی و فلاحی ادارہ',
-  locationEnglish: 'Pakistan',
-  locationUrdu: 'پاکستان',
+  nameEnglish: 'JIM Punjab',
+  nameUrdu: 'جماعت اصلاح المسلمین پنجاب',
+  subHeaderEnglish: 'Jamaat Islahul Muslimeen Punjab',
+  subHeaderUrdu: 'پنجاب زون',
+  locationEnglish: 'Punjab, Pakistan',
+  locationUrdu: 'پنجاب، پاکستان',
   phone: '0300-1234567',
-  email: 'info@markazroohulislam.org',
+  email: 'info@jimpunjab.org',
   currency: 'PKR',
   currencySymbol: 'Rs.',
   currencySymbolUrdu: 'روپے',
   receiptPrefix: 'REC-',
   receiptCounter: 1,
-  signatoryName: 'MARKAZ ADMINISTRATION',
+  targetCollectionAmount: 10000000,
+  signatoryName: 'JIM PUNJAB ADMINISTRATION',
   signatoryTitle: 'AUTHORIZED SIGNATORY',
-  stampOfficeText: 'MARKAZ ROOH UL ISLAM\nFINANCE & ACCOUNTS DEPARTMENT\nAUTHORIZED OFFICIAL STAMP',
+  stampOfficeText: 'JAMAAT ISLAHUL MUSLIMEEN PUNJAB\nFINANCE & ACCOUNTS DEPARTMENT\nAUTHORIZED OFFICIAL STAMP',
   duaUrdu: 'جَزَاكُمُ اللَّهُ خَيْرًا كَثِيرًا وَأَجْرًا كَبِيرًا وَأَحْسَنَ الْجَزَاءَ فِي الدُّنْيَا وَالْآخِرَةِ',
   duaEnglish: 'May Allah reward you with abundant goodness and best reward in this world and the Hereafter.',
   bankAccounts: defaultBankAccounts,

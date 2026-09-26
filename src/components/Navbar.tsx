@@ -115,14 +115,14 @@ export const Navbar: React.FC = () => {
             <div 
               className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
               onClick={handleBrandClick}
-              title="Markaz Rooh ul Islam - Home"
+              title="JIM Punjab - Home"
             >
               {/* Double Gold-Ring Medallion Logo */}
               <div className="relative w-11 h-11 sm:w-13 sm:h-13 rounded-full p-1 bg-gradient-to-br from-emerald-800 via-emerald-950 to-[#011c15] border-2 border-amber-400 shadow-[0_4px_15px_rgba(0,0,0,0.5)] flex items-center justify-center shrink-0 group-hover:border-amber-300 transition-all duration-300 group-hover:scale-105 ring-2 ring-amber-400/30">
                 <div className="absolute inset-0 rounded-full bg-amber-400/15 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
                 <img 
                   src="/logo.png" 
-                  alt="Markaz Rooh ul Islam Emblem" 
+                  alt="JIM Punjab Emblem" 
                   className="w-full h-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] relative z-10 transition-transform duration-300 group-hover:scale-105" 
                 />
               </div>
@@ -131,11 +131,11 @@ export const Navbar: React.FC = () => {
               <div className="min-w-0 flex flex-col justify-center">
                 <div className="flex items-center gap-2 truncate">
                   <h1 className="text-xs sm:text-sm md:text-base font-black text-white tracking-wide truncate uppercase drop-shadow-xs group-hover:text-amber-100 transition-colors">
-                    {orgConfig.nameEnglish || 'Markaz Rooh ul Islam'}
+                    {orgConfig.nameEnglish || 'JIM Punjab'}
                   </h1>
                   <span className="hidden sm:inline-block text-amber-400/60 text-xs">✦</span>
                   <span className="font-arabic text-xs sm:text-sm md:text-base font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-300 to-amber-100 shrink-0 drop-shadow-xs dir-rtl">
-                    مرکز روح الاسلام
+                    جماعت اصلاح المسلمین پنجاب
                   </span>
                 </div>
                 
@@ -144,7 +144,7 @@ export const Navbar: React.FC = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                   </span>
-                  <span className="truncate">ادارتی نظامِ حسابات &bull; Shariah Fund Accounting</span>
+                  <span className="truncate">Jamaat Islahul Muslimeen Punjab &bull; Membership Accounts</span>
                 </div>
               </div>
             </div>

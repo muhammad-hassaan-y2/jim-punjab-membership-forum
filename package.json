@@ -1,5 +1,5 @@
 {
-  "name": "financial-record-keeper",
+  "name": "jim-punjab-membership-forum",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -9,6 +9,7 @@
     "start": "next start -p 3002"
   },
   "dependencies": {
+    "@google/genai": "^2.24.0",
     "@neondatabase/serverless": "^1.1.0",
     "canvas-confetti": "^1.9.4",
     "cors": "^2.8.6",

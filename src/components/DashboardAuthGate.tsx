@@ -48,8 +48,8 @@ export const DashboardAuthGate: React.FC = () => {
     }
   };
 
-  const handleCopyCredentials = () => {
-    navigator.clipboard.writeText('Email: admin@markaz.com\nPassword: Markaz@2026');
+  const handleCopyCredentials = (emailStr = 'ali@markaz.com', passStr = 'Ali@2026') => {
+    navigator.clipboard.writeText(`Email: ${emailStr}\nPassword: ${passStr}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -99,53 +99,68 @@ export const DashboardAuthGate: React.FC = () => {
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full p-1 bg-gradient-to-br from-emerald-800 via-emerald-950 to-[#022c22] border-2 border-amber-400 shadow-xl flex items-center justify-center mb-3.5 ring-4 ring-amber-400/20">
             <img 
               src="/logo.png" 
-              alt="Markaz Rooh ul Islam" 
+              alt="JIM Punjab" 
               className="w-full h-full object-contain filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" 
             />
           </div>
 
           <div className="font-arabic text-xl sm:text-2xl font-bold text-amber-300 drop-shadow-xs">
-            مرکز روح الاسلام
+            جماعت اصلاح المسلمین پنجاب
           </div>
           <h1 className="text-base sm:text-lg font-black text-white tracking-wide uppercase mt-0.5">
-            Markaz Rooh ul Islam
+            JIM Punjab Membership Forum
           </h1>
           <p className="text-xs text-emerald-200/90 font-medium mt-1">
-            Financial Accounting Portal &bull; Institutional Login
+            Financial Accounting & Membership Ledger Portal &bull; Institutional Sign In
           </p>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/90 border border-amber-400/30 text-[11px] text-amber-300 font-semibold mt-3">
             <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>Public Registration Disabled &bull; Authorized Personnel Only</span>
+            <span>Authorized Accounts Only &bull; Neon Cloud Secured</span>
           </div>
         </div>
 
-        {/* Official Credentials Box for Easy Access */}
-        <div className="relative z-10 bg-amber-950/40 border-b border-amber-400/30 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
-            <div>
-              <span className="text-amber-200 font-bold block">Official Admin Credentials:</span>
-              <span className="text-amber-100 font-mono text-[11px]">admin@markaz.com &bull; Markaz@2026</span>
+        {/* Official Credentials Box with ali@markaz.com featured */}
+        <div className="relative z-10 bg-amber-950/40 border-b border-amber-400/30 px-6 py-3.5 space-y-2 text-xs">
+          {/* Ali primary account */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <span className="text-amber-200 font-bold block text-xs">User Account (Ali):</span>
+                <span className="text-amber-100 font-mono text-[11px]">ali@markaz.com &bull; Ali@2026</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleCopyCredentials('ali@markaz.com', 'Ali@2026')}
+                className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 text-[11px] font-bold border border-amber-400/40 flex items-center gap-1 cursor-pointer transition-colors"
+                title="Copy Ali credentials"
+              >
+                {copied ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAutoFillAndLogin('ali@markaz.com', 'Ali@2026')}
+                className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 text-[11px] font-black shadow-xs hover:from-amber-300 hover:to-amber-400 flex items-center gap-1 cursor-pointer transition-transform hover:scale-105"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-950" />
+                <span>1-Click Login</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleCopyCredentials}
-              className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 text-[11px] font-bold border border-amber-400/40 flex items-center gap-1 cursor-pointer transition-colors"
-              title="Copy credentials"
-            >
-              {copied ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-              <span>{copied ? 'Copied' : 'Copy'}</span>
-            </button>
+
+          {/* Admin fallback account */}
+          <div className="pt-1.5 border-t border-amber-400/15 flex items-center justify-between text-[11px] text-emerald-200/80">
+            <span>Also available: <span className="font-mono text-amber-200">admin@markaz.com</span> (<span className="font-mono">Markaz@2026</span>)</span>
             <button
               type="button"
               onClick={() => handleAutoFillAndLogin('admin@markaz.com', 'Markaz@2026')}
-              className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 text-[11px] font-black shadow-xs hover:from-amber-300 hover:to-amber-400 flex items-center gap-1 cursor-pointer transition-transform hover:scale-105"
+              className="text-amber-300 hover:underline cursor-pointer font-bold"
             >
-              <Sparkles className="w-3 h-3 text-emerald-950" />
-              <span>1-Click Login</span>
+              Sign In as Admin &rarr;
             </button>
           </div>
         </div>
@@ -172,7 +187,7 @@ export const DashboardAuthGate: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@markaz.com"
+                  placeholder="ali@markaz.com"
                   className="w-full pl-10 pr-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none text-slate-900"
                 />
               </div>

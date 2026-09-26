@@ -9,32 +9,48 @@ export function exportTransactionsToExcel(
   transactions: Transaction[],
   categories: FundCategory[],
   orgConfig: OrganizationConfig,
-  fileName: string = 'Al_Jamia_Financial_Sheets'
+  fileName: string = 'JIM_Punjab_Accounting_Ledger'
 ) {
-  const categoryMap = new Map(categories.map(c => [c.id, { en: c.nameEnglish, ur: c.nameUrdu }]));
-
   const rows = transactions.map((t, index) => {
-    const cat = categoryMap.get(t.categoryId);
+    const months = t.monthsData || {};
+    const target = t.annuallyAmount && t.annuallyAmount > 0 
+      ? t.annuallyAmount 
+      : (t.quarterlyAmount && t.quarterlyAmount > 0 
+          ? t.quarterlyAmount * 4 
+          : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
+    const paid = Object.values(months).length > 0 
+      ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+      : Number(t.amount || 0);
+    const balance = Math.max(0, target - paid);
+
     return {
       'Sr #': index + 1,
       'Receipt No / رسید نمبر': t.receiptNo,
       'Date / تاریخ': t.date,
-      'Received From (اسم گرامی)': t.donorNameUrdu || t.donorName,
-      'Address / پتہ': t.address || '',
-      'City / شہر': t.city || '',
-      'Preferred Period / مدت': t.preferredPeriod || '',
-      'Monthly / ماہانہ': t.monthlyAmount || '',
-      'Quarterly / سہ ماہی': t.quarterlyAmount || '',
-      'Half Yearly / شش ماہی': t.halfYearlyAmount || '',
-      'Annually / سالانہ': t.annuallyAmount || '',
-      'Total Amount as Period / کل رقم': t.amount,
-      'Type / نوعیت': t.type === 'income' ? 'آمدن (Income)' : 'اخراجات (Expense)',
-      'Category / شعبہ فنڈ': cat ? `${cat.ur} (${cat.en})` : t.categoryId,
-      'Payment Mode / طریقہ': t.paymentMode,
-      'Bank Name / بینک': t.bankName || 'N/A',
-      'Mobile # / موبائل': t.phone || '',
-      'Status / کیفیت': t.status,
-      'Notes / تفصیل': t.notes || '',
+      'Donor Name / نام دہندہ': t.donorName || t.donorNameUrdu || '',
+      'Branch Name / برانچ': t.branchName || '',
+      'Zila / ضلع': t.zila || t.city || '',
+      'Phone / فون نمبر': t.phone || '',
+      'Monthly / ماہانہ رقم': t.monthlyAmount || 0,
+      'Quarterly / سہ ماہی رقم': t.quarterlyAmount || 0,
+      'Annually / سالانہ رقم': t.annuallyAmount || 0,
+      'Jan / جنوری': months.jan || 0,
+      'Feb / فروری': months.feb || 0,
+      'Mar / مارچ': months.mar || 0,
+      'Apr / اپریل': months.apr || 0,
+      'May / مئی': months.may || 0,
+      'Jun / جون': months.jun || 0,
+      'Jul / جولائی': months.jul || 0,
+      'Aug / اگست': months.aug || 0,
+      'Sep / ستمبر': months.sep || 0,
+      'Oct / اکتوبر': months.oct || 0,
+      'Nov / نومبر': months.nov || 0,
+      'Dec / دسمبر': months.dec || 0,
+      'Total Paid / کل وصولی': paid,
+      'Balance Due / واجب الادا': balance,
+      'Payment Mode / طریقہ': t.paymentMode || 'Cash',
+      'Bank Name / بینک': t.bankName || '',
+      'Notes / کیفیات': t.notes || '',
     };
   });
 
@@ -43,20 +59,32 @@ export function exportTransactionsToExcel(
   // Set column widths
   worksheet['!cols'] = [
     { wch: 6 },  // Sr #
-    { wch: 26 }, // Receipt No
+    { wch: 16 }, // Receipt No
     { wch: 12 }, // Date
-    { wch: 28 }, // Donor / Payee Name
-    { wch: 24 }, // English Name
-    { wch: 15 }, // Amount
-    { wch: 18 }, // Type
-    { wch: 24 }, // Category
+    { wch: 25 }, // Donor Name
+    { wch: 20 }, // Branch
+    { wch: 16 }, // Zila
+    { wch: 16 }, // Phone
+    { wch: 14 }, // Monthly
+    { wch: 14 }, // Quarterly
+    { wch: 14 }, // Annually
+    { wch: 10 }, // Jan
+    { wch: 10 }, // Feb
+    { wch: 10 }, // Mar
+    { wch: 10 }, // Apr
+    { wch: 10 }, // May
+    { wch: 10 }, // Jun
+    { wch: 10 }, // Jul
+    { wch: 10 }, // Aug
+    { wch: 10 }, // Sep
+    { wch: 10 }, // Oct
+    { wch: 10 }, // Nov
+    { wch: 10 }, // Dec
+    { wch: 16 }, // Total Paid
+    { wch: 16 }, // Balance Due
     { wch: 14 }, // Payment Mode
-    { wch: 22 }, // Bank
-    { wch: 18 }, // Cheque/Txn #
-    { wch: 30 }, // Address
-    { wch: 26 }, // Reference
-    { wch: 12 }, // Status
-    { wch: 35 }, // Notes
+    { wch: 20 }, // Bank Name
+    { wch: 28 }, // Notes
   ];
 
   const workbook = XLSX.utils.book_new();
@@ -257,27 +285,56 @@ export function printSheetAsPDF(
     return;
   }
 
+  const totalPledged = transactions.reduce((sum, t) => {
+    const tgt = t.annuallyAmount && t.annuallyAmount > 0 
+      ? t.annuallyAmount 
+      : (t.quarterlyAmount && t.quarterlyAmount > 0 
+          ? t.quarterlyAmount * 4 
+          : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
+    return sum + (Number(tgt) || 0);
+  }, 0);
+
+  const totalPaidSum = transactions.reduce((sum, t) => {
+    const months = t.monthsData || {};
+    const paid = Object.values(months).length > 0
+      ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+      : Number(t.amount || 0);
+    return sum + paid;
+  }, 0);
+
+  const totalBalanceDue = Math.max(0, totalPledged - totalPaidSum);
+
   const tableRowsHtml = transactions.length === 0
     ? `<tr><td colspan="15" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
     : transactions.map((t, index) => {
-        const catName = categoryMap.get(t.categoryId) || t.categoryId;
+        const months = t.monthsData || {};
+        const tgt = t.annuallyAmount && t.annuallyAmount > 0 
+          ? t.annuallyAmount 
+          : (t.quarterlyAmount && t.quarterlyAmount > 0 
+              ? t.quarterlyAmount * 4 
+              : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
+        const paid = Object.values(months).length > 0
+          ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+          : Number(t.amount || 0);
+        const bal = Math.max(0, tgt - paid);
+
         return `
           <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 5px 6px; font-family: monospace; text-align: center; color: #64748b;">${index + 1}</td>
-            <td style="padding: 5px 6px; font-family: monospace; font-weight: bold; color: #2563eb;">${t.receiptNo || '---'}</td>
-            <td style="padding: 5px 6px; font-family: monospace; text-align: center;">${t.date || '---'}</td>
-            <td style="padding: 5px 6px; font-weight: 600;">${t.donorName || t.donorNameUrdu || '---'}</td>
-            <td style="padding: 5px 6px; color: #475569; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.address || '---'}</td>
-            <td style="padding: 5px 6px; color: #475569;">${t.city || '---'}</td>
-            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.monthlyAmount ? Number(t.monthlyAmount).toLocaleString() : (t.preferredPeriod === 'Monthly' ? '✓' : '-')}</td>
-            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? Number(t.quarterlyAmount).toLocaleString() : (t.preferredPeriod === 'Quarterly' ? '✓' : '-')}</td>
-            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.halfYearlyAmount ? Number(t.halfYearlyAmount).toLocaleString() : (t.preferredPeriod === 'Half Yearly' ? '✓' : '-')}</td>
-            <td style="padding: 5px 6px; text-align: right; font-family: monospace;">${t.annuallyAmount ? Number(t.annuallyAmount).toLocaleString() : (t.preferredPeriod === 'Annually' ? '✓' : '-')}</td>
-            <td style="padding: 5px 6px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">${Number(t.amount || 0).toLocaleString()}</td>
-            <td style="padding: 5px 6px; text-align: center;">${t.paymentMode || 'Cash'}</td>
-            <td style="padding: 5px 6px; color: #475569;">${t.bankName || '---'}</td>
-            <td style="padding: 5px 6px; font-family: monospace;">${t.phone || '---'}</td>
-            <td style="padding: 5px 6px; font-weight: 600; color: #0284c7;">${catName}</td>
+            <td style="padding: 4px 5px; font-family: monospace; text-align: center; color: #64748b;">${index + 1}</td>
+            <td style="padding: 4px 5px; font-family: monospace; font-weight: bold; color: #2563eb;">${t.receiptNo || '---'}</td>
+            <td style="padding: 4px 5px; font-family: monospace; text-align: center;">${t.date || '---'}</td>
+            <td style="padding: 4px 5px; font-weight: 600;">${t.donorName || t.donorNameUrdu || '---'}</td>
+            <td style="padding: 4px 5px; color: #334155;">${t.branchName || '---'}</td>
+            <td style="padding: 4px 5px; color: #334155;">${t.zila || t.city || '---'}</td>
+            <td style="padding: 4px 5px; font-family: monospace;">${t.phone || '---'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.monthlyAmount ? Number(t.monthlyAmount).toLocaleString() : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? Number(t.quarterlyAmount).toLocaleString() : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.annuallyAmount ? Number(t.annuallyAmount).toLocaleString() : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">${Number(paid).toLocaleString()}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace; font-weight: bold; color: ${bal > 0 ? '#e11d48' : '#059669'};">${bal > 0 ? Number(bal).toLocaleString() : 'Paid ✓'}</td>
+            <td style="padding: 4px 5px; text-align: center;">${t.paymentMode || 'Cash'}</td>
+            <td style="padding: 4px 5px; color: #475569;">${t.bankName || '---'}</td>
+            <td style="padding: 4px 5px; color: #64748b; font-size: 9px;">${t.notes || '---'}</td>
           </tr>
         `;
       }).join('');
@@ -287,18 +344,18 @@ export function printSheetAsPDF(
     <html>
       <head>
         <meta charset="utf-8">
-        <title>${sheetName} - Financial Ledger</title>
+        <title>${sheetName} - Financial Accounting Schedule</title>
         <style>
           @page {
             size: landscape;
-            margin: 10mm;
+            margin: 8mm;
           }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
             margin: 0;
-            padding: 16px;
+            padding: 12px;
             color: #1e293b;
-            font-size: 11px;
+            font-size: 10px;
             background: #ffffff;
           }
           .header-box {
@@ -306,16 +363,16 @@ export function printSheetAsPDF(
             justify-content: space-between;
             align-items: flex-start;
             border-bottom: 2px solid #059669;
-            padding-bottom: 12px;
-            margin-bottom: 12px;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
           }
           .org-title {
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 900;
             color: #0f172a;
           }
           .org-sub {
-            font-size: 11px;
+            font-size: 10px;
             color: #64748b;
             margin-top: 2px;
           }
@@ -324,65 +381,65 @@ export function printSheetAsPDF(
             background: #059669;
             color: white;
             font-weight: 800;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            margin-top: 4px;
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 11px;
+            margin-top: 3px;
           }
           .kpi-row {
             display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
+            gap: 10px;
+            margin-bottom: 10px;
           }
           .kpi-card {
             flex: 1;
-            padding: 8px 12px;
+            padding: 6px 10px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            border-radius: 6px;
           }
           .kpi-label {
-            font-size: 9px;
+            font-size: 8px;
             text-transform: uppercase;
             font-weight: 700;
             color: #64748b;
           }
           .kpi-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 900;
             font-family: monospace;
-            margin-top: 2px;
+            margin-top: 1px;
           }
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
+            font-size: 9px;
           }
           th {
             background: #f1f5f9;
             color: #334155;
             font-weight: 800;
             text-align: left;
-            padding: 6px 8px;
+            padding: 5px 6px;
             border-bottom: 2px solid #cbd5e1;
-            font-size: 9px;
+            font-size: 8px;
             text-transform: uppercase;
           }
           .footer-box {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 20px;
-            padding-top: 12px;
+            margin-top: 16px;
+            padding-top: 10px;
             border-top: 1px solid #e2e8f0;
-            font-size: 10px;
+            font-size: 9px;
             color: #64748b;
           }
           .sign-box {
             text-align: center;
             border-top: 1px solid #94a3b8;
-            width: 180px;
-            padding-top: 6px;
+            width: 170px;
+            padding-top: 5px;
           }
           @media print {
             body { padding: 0; }
@@ -393,54 +450,54 @@ export function printSheetAsPDF(
       <body>
         <div class="header-box">
           <div>
-            <div class="org-title">${orgConfig.nameEnglish}</div>
-            <div class="org-sub">${orgConfig.subHeaderEnglish} • Phone: ${orgConfig.phone}</div>
-            <div class="sheet-badge">${sheetName} — Financial Record Sheet</div>
+            <div class="org-title">${orgConfig.nameEnglish} (Jamaat Islahul Muslimeen Punjab)</div>
+            <div class="org-sub">Institutional Membership Fund Accounts Schedule • Phone: ${orgConfig.phone}</div>
+            <div class="sheet-badge">${sheetName} — Membership Accounting Register</div>
           </div>
           <div style="text-align: right;">
-            <div style="font-weight: bold; font-size: 11px;">Certified Financial Ledger</div>
-            <div style="color: #64748b; font-size: 10px; margin-top: 2px;">Generated: ${new Date().toLocaleString()}</div>
-            <div style="color: #059669; font-weight: bold; font-size: 10px; margin-top: 2px;">Neon DB Synchronized</div>
+            <div style="font-weight: bold; font-size: 11px;">Official Accounting Ledger</div>
+            <div style="color: #64748b; font-size: 9px; margin-top: 2px;">Date: ${new Date().toLocaleString()}</div>
+            <div style="color: #059669; font-weight: bold; font-size: 9px; margin-top: 2px;">Neon DB Verified</div>
           </div>
         </div>
 
         <div class="kpi-row">
           <div class="kpi-card">
-            <div class="kpi-label">Total Inflows (Collections)</div>
-            <div class="kpi-value" style="color: #059669;">${orgConfig.currencySymbol} ${totalInflows.toLocaleString()}</div>
+            <div class="kpi-label">Total Donors Enrolled</div>
+            <div class="kpi-value" style="color: #2563eb;">${transactions.length} Donors</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Total Outflows</div>
-            <div class="kpi-value" style="color: #e11d48;">${orgConfig.currencySymbol} ${totalOutflows.toLocaleString()}</div>
+            <div class="kpi-label">Total Target Pledged</div>
+            <div class="kpi-value" style="color: #475569;">${orgConfig.currencySymbol} ${totalPledged.toLocaleString()}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Net Balance</div>
-            <div class="kpi-value" style="color: #0f172a;">${orgConfig.currencySymbol} ${netBalance.toLocaleString()}</div>
+            <div class="kpi-label">Total Collected (Paid)</div>
+            <div class="kpi-value" style="color: #059669;">${orgConfig.currencySymbol} ${totalPaidSum.toLocaleString()}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Total Records</div>
-            <div class="kpi-value" style="color: #2563eb;">${transactions.length} Entries</div>
+            <div class="kpi-label">Total Outstanding Arrears</div>
+            <div class="kpi-value" style="color: #e11d48;">${orgConfig.currencySymbol} ${totalBalanceDue.toLocaleString()}</div>
           </div>
         </div>
 
         <table>
           <thead>
             <tr>
-              <th style="width: 28px; text-align: center;">#</th>
-              <th style="width: 90px;">Receipt No</th>
-              <th style="width: 70px; text-align: center;">Date</th>
-              <th>Received From</th>
-              <th>Address</th>
-              <th>City</th>
+              <th style="width: 25px; text-align: center;">#</th>
+              <th style="width: 75px;">Receipt No</th>
+              <th style="width: 65px; text-align: center;">Date</th>
+              <th>Donor Name</th>
+              <th>Branch</th>
+              <th>Zila</th>
+              <th>Phone</th>
               <th style="text-align: right;">Monthly</th>
               <th style="text-align: right;">Quarterly</th>
-              <th style="text-align: right;">Half Yearly</th>
               <th style="text-align: right;">Annually</th>
-              <th style="text-align: right;">Total Amount (${orgConfig.currencySymbol})</th>
-              <th style="text-align: center;">Payment</th>
+              <th style="text-align: right;">Total Paid</th>
+              <th style="text-align: right;">Balance Due</th>
+              <th style="text-align: center;">Mode</th>
               <th>Bank Name</th>
-              <th>Mobile #</th>
-              <th>Fund Category</th>
+              <th>Remarks</th>
             </tr>
           </thead>
           <tbody>
@@ -450,12 +507,12 @@ export function printSheetAsPDF(
 
         <div class="footer-box">
           <div>
-            <div><strong>${orgConfig.nameEnglish}</strong> • Official Financial Records</div>
-            <div>All funds segregated according to institutional & Shariah compliance.</div>
+            <div><strong>${orgConfig.nameEnglish}</strong> • Department of Finance & Accounts</div>
+            <div>All contributions recorded exclusively under Membership Fund (ممبر شپ فنڈ).</div>
           </div>
           <div class="sign-box">
             <div style="font-weight: bold; color: #0f172a;">${orgConfig.signatoryName}</div>
-            <div style="font-size: 9px; color: #64748b;">${orgConfig.signatoryTitle}</div>
+            <div style="font-size: 8px; color: #64748b;">${orgConfig.signatoryTitle}</div>
           </div>
         </div>
 

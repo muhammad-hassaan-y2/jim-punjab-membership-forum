@@ -25,7 +25,10 @@ import {
   Lock,
   CheckCircle2,
   Calendar,
-  Filter
+  Filter,
+  Target,
+  Database,
+  X
 } from 'lucide-react';
 import { exportTransactionsToExcel, printSheetAsPDF } from '../utils/exportUtils';
 
@@ -36,13 +39,28 @@ export const DashboardView: React.FC = () => {
     setActiveSheetTabId, 
     createRawBlankSheet, 
     createTemplateSheet, 
+    saveAllSheetsToDatabase,
+    batchCreateAndSaveSheets,
+    setActiveTab,
     transactions,
     categories,
     totalIncome,
     totalExpense,
     netBalance,
+    targetToCollect,
+    setTargetToCollect,
+    totalPledgedTarget,
+    totalDonorsCount,
+    totalPaidCount,
+    monthlyPledgedSum,
+    quarterlyPledgedSum,
+    annuallyPledgedSum,
+    collectedIn2026,
+    projects,
+    activeProjectId,
     orgConfig,
     deleteSheetTab,
+    addTransaction,
     dbStatus,
     dbLatency
   } = useFinance();
@@ -51,6 +69,10 @@ export const DashboardView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState(targetToCollect.toString());
+  const [isSavingDb, setIsSavingDb] = useState(false);
+  const [dbSuccessToast, setDbSuccessToast] = useState<string | null>(null);
 
   // Handle direct navigation to dynamic sheet route
   const handleOpenSheet = (tabId: string) => {
@@ -82,33 +104,38 @@ export const DashboardView: React.FC = () => {
           const matchRef = t.reference?.toLowerCase().includes(q);
           const matchReceipt = t.receiptNo?.toLowerCase().includes(q);
           const matchNotes = t.notes?.toLowerCase().includes(q);
-          if (!matchName && !matchRef && !matchReceipt && !matchNotes) return false;
+          const matchCity = t.city?.toLowerCase().includes(q);
+          if (!matchName && !matchRef && !matchReceipt && !matchNotes && !matchCity) return false;
         }
         return true;
       })
       .slice(0, 10);
   }, [transactions, selectedType, selectedCategory, searchTerm]);
 
-  // Restricted Zakat and Fitrana calculations
-  const zakatInflow = useMemo(() => {
-    return transactions
-      .filter((t) => t.categoryId === 'zakat' && t.type === 'income')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  }, [transactions]);
+  // Effective target to collect: dynamically sum all member commitments from the sheets
+  const effectiveTarget = totalPledgedTarget > 0 ? totalPledgedTarget : targetToCollect;
 
-  const zakatExpense = useMemo(() => {
-    return transactions
-      .filter((t) => t.categoryId === 'zakat' && t.type === 'expense')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  }, [transactions]);
+  // Target collection progress
+  const targetProgress = useMemo(() => {
+    if (!effectiveTarget || effectiveTarget <= 0) return 0;
+    return Math.min(100, Math.round((totalIncome / effectiveTarget) * 100));
+  }, [totalIncome, effectiveTarget]);
 
-  const zakatNet = zakatInflow - zakatExpense;
+  const remainingToCollect = Math.max(0, effectiveTarget - totalIncome);
+
+  const handleSaveTarget = () => {
+    const num = Number(tempTarget.replace(/,/g, ''));
+    if (!isNaN(num) && num > 0) {
+      setTargetToCollect(num);
+    }
+    setIsEditingTarget(false);
+  };
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-20 max-w-7xl mx-auto px-2 sm:px-4">
       
       {/* ====================================================================
-          1. REGAL ISLAMIC EXECUTIVE BANNER
+          1. REGAL ISLAMIC EXECUTIVE BANNER - JIM PUNJAB
           ==================================================================== */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-[#022c22] to-[#011c15] border-2 border-amber-400/80 shadow-[0_15px_40px_rgba(6,78,59,0.25)] text-white p-6 sm:p-8">
         
@@ -140,20 +167,20 @@ export const DashboardView: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="font-arabic text-xl sm:text-2xl text-amber-300 font-bold drop-shadow-xs">
-                مرکز روح الاسلام
+                جماعت اصلاح المسلمین پنجاب
               </span>
               <span className="text-amber-400/70 text-sm">✦</span>
               <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-300">
-                Executive Portal
+                JIM Punjab Portal
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight leading-snug">
-              Institutional Financial Dashboard
+              Jamaat Islahul Muslimeen Punjab
             </h1>
 
             <p className="text-xs sm:text-sm text-emerald-200/90 max-w-2xl font-medium leading-relaxed">
-              Centralized accounts intelligence, strict mathematical Shariah fund isolation, and real-time cloud ledger synchronization for {orgConfig.nameEnglish || 'Markaz Rooh ul Islam'}.
+              Institutional Financial Control Center • Membership Fund Management & Punjab District Spreadsheets • Campaign Year 2026.
             </p>
 
           </div>
@@ -162,90 +189,132 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* ====================================================================
-          2. EXECUTIVE FINANCIAL METRIC CARDS (4-CARD GRID)
+          2. CORE EXECUTIVE FINANCIAL METRICS
+          1) How much money to collect (Target Goal & Remaining)
+          2) How much is collected (Total Inflows across 12 months)
           ==================================================================== */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         
-        {/* Total Inflows */}
-        <div className="bg-white rounded-3xl p-5 border border-amber-300/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+        {/* 1. HOW MUCH MONEY TO COLLECT */}
+        <div className="bg-white rounded-3xl p-6 border-2 border-amber-400/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Total Inflows
-            </span>
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                How Much to Collect
+              </span>
+              <span className="text-[11px] text-amber-700 font-bold">معینہ ہدف (Pledged Target)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {isEditingTarget ? (
+                <button
+                  onClick={handleSaveTarget}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-600 text-white hover:bg-amber-700 cursor-pointer"
+                >
+                  Save
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setTempTarget(effectiveTarget.toString());
+                    setIsEditingTarget(true);
+                  }}
+                  className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 flex items-center justify-center font-bold text-xs cursor-pointer"
+                  title="Edit Target Goal"
+                >
+                  ✏️
+                </button>
+              )}
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold">
+                <Target className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+          </div>
+
+          {isEditingTarget ? (
+            <div className="my-1">
+              <input
+                type="number"
+                value={tempTarget}
+                onChange={(e) => setTempTarget(e.target.value)}
+                className="w-full text-xl font-bold font-mono border border-amber-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                autoFocus
+              />
+              <span className="text-[10px] text-slate-400">Target collection amount</span>
+            </div>
+          ) : (
+            <div>
+              <div className="text-3xl sm:text-4xl font-black text-amber-700 font-mono tracking-tight">
+                {orgConfig.currencySymbol} {effectiveTarget.toLocaleString()}
+              </div>
+              <span className="text-xs font-semibold text-slate-500 block mt-1">
+                {totalPledgedTarget > 0 ? '✓ Live Calculated from Member Commitments' : 'Campaign Target Goal'}
+              </span>
+            </div>
+          )}
+
+          {/* Progress Bar & Remaining */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+              <span className="text-slate-500">Progress</span>
+              <span className="text-amber-700 font-mono">{targetProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-amber-500 to-emerald-600 h-2.5 rounded-full transition-all duration-500"
+                style={{ width: `${targetProgress}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between mt-2.5 text-xs font-semibold text-slate-600">
+              <span>Remaining to Collect:</span>
+              <span className="font-mono font-bold text-rose-600 text-sm">
+                {orgConfig.currencySymbol} {remainingToCollect.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {(monthlyPledgedSum > 0 || quarterlyPledgedSum > 0 || annuallyPledgedSum > 0) && (
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
+              <span className="font-sans font-medium text-slate-400">Pledges:</span>
+              <span className="font-bold text-amber-800">
+                {monthlyPledgedSum > 0 && `₨${monthlyPledgedSum.toLocaleString()}/mo `}
+                {quarterlyPledgedSum > 0 && `₨${quarterlyPledgedSum.toLocaleString()}/qtr `}
+                {annuallyPledgedSum > 0 && `₨${annuallyPledgedSum.toLocaleString()}/yr`}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 2. HOW MUCH IS COLLECTED */}
+        <div className="bg-white rounded-3xl p-6 border-2 border-emerald-400/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                How Much is Collected
+              </span>
+              <span className="text-[11px] text-emerald-700 font-bold">کل وصولی (Total Realized)</span>
+            </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
               <Coins className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono tracking-tight">
+          <div className="text-3xl sm:text-4xl font-black text-emerald-700 font-mono tracking-tight">
             {orgConfig.currencySymbol} {totalIncome.toLocaleString()}
           </div>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-emerald-800">
+          <div className="flex items-center gap-1.5 mt-2.5 text-xs font-semibold text-emerald-800">
             <ArrowUpRight className="w-4 h-4 text-emerald-600" />
-            <span>{transactions.filter(t => t.type === 'income').length} collections</span>
+            <span>{totalPaidCount > 0 ? `${totalPaidCount} members contributing` : '0 payments recorded'} ({transactions.filter(t => t.type === 'income').length} sheet rows)</span>
           </div>
-        </div>
-
-        {/* Total Outflows */}
-        <div className="bg-white rounded-3xl p-5 border border-amber-300/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Total Outflows
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center font-bold">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-rose-700 font-mono tracking-tight">
-            {orgConfig.currencySymbol} {totalExpense.toLocaleString()}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-rose-800">
-            <ArrowDownRight className="w-4 h-4 text-rose-600" />
-            <span>{transactions.filter(t => t.type === 'expense').length} expenditures</span>
-          </div>
-        </div>
-
-        {/* Net Available Balance */}
-        <div className="bg-white rounded-3xl p-5 border-2 border-amber-400/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Net Balance
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold">
-              <Wallet className="w-5 h-5" />
-            </div>
-          </div>
-          <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${netBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-            {orgConfig.currencySymbol} {netBalance.toLocaleString()}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-800">
-            <Building2 className="w-4 h-4 text-amber-600" />
-            <span>Liquid cash & bank reserve</span>
-          </div>
-        </div>
-
-        {/* Restricted Zakat & Relief Fund */}
-        <div className="bg-white rounded-3xl p-5 border border-amber-300/60 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Restricted Zakat
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center font-bold">
-              <Lock className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-blue-900 font-mono tracking-tight">
-            {orgConfig.currencySymbol} {zakatNet.toLocaleString()}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-blue-800">
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
-            <span>Dedicated welfare pool</span>
+          <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Membership collections</span>
+            <span className="font-bold text-emerald-700">Live Sheet Calculation</span>
           </div>
         </div>
 
       </section>
 
       {/* ====================================================================
-          3. SHARIAH FUND SEGREGATION MATRIX
+          3. MEMBERSHIP FUND SPECIFICATION SECTION
+          Only Membership Funds allowed (Zakat, Fitrat, etc. removed)
           ==================================================================== */}
       <section className="bg-white rounded-3xl border border-amber-300/70 p-5 sm:p-7 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
@@ -253,54 +322,54 @@ export const DashboardView: React.FC = () => {
             <div className="flex items-center gap-2">
               <Layers className="w-5 h-5 text-emerald-700" />
               <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-wide">
-                Shariah Funds Allocation Matrix
+                Dedicated Membership Fund • ممبر شپ فنڈ
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Strict mathematical isolation between restricted welfare versus general endowment funds
+              Jamaat Islahul Muslimeen Punjab membership subscription contributions and records
             </p>
           </div>
           <span className="text-xs font-bold text-emerald-800 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-200 self-start sm:self-auto">
-            {categories.length} Dedicated Shariah Accounts
+            Primary Fund: Membership Only
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-5">
-          {categories.map((cat) => {
-            const catIncome = transactions
-              .filter((t) => t.categoryId === cat.id && t.type === 'income')
-              .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-            const catExpense = transactions
-              .filter((t) => t.categoryId === cat.id && t.type === 'expense')
-              .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
-            const catBalance = catIncome - catExpense;
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5">
+          <div className="p-4 rounded-2xl bg-[#fdfaf3] border border-amber-200/80 shadow-2xs">
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">
+              Membership Collections (Inflows)
+            </span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-emerald-800 block mt-1">
+              {orgConfig.currencySymbol} {totalIncome.toLocaleString()}
+            </span>
+            <span className="text-xs text-emerald-700 font-medium mt-1 block">
+              Direct member contributions
+            </span>
+          </div>
 
-            return (
-              <div 
-                key={cat.id} 
-                className="p-3.5 rounded-2xl bg-[#fdfaf3] border border-amber-200/80 hover:border-amber-400 transition-all flex flex-col justify-between shadow-2xs hover:shadow-xs"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-black text-slate-900 truncate">
-                      {cat.nameEnglish}
-                    </span>
-                  </div>
-                  <span className="font-arabic text-xs font-bold text-amber-700 block dir-rtl truncate mt-0.5">
-                    {cat.nameUrdu}
-                  </span>
-                </div>
-                <div className="mt-3 pt-2 border-t border-amber-200/60">
-                  <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
-                    Balance
-                  </span>
-                  <span className="text-xs sm:text-sm font-black font-mono text-emerald-900 block truncate">
-                    {orgConfig.currencySymbol} {catBalance.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          <div className="p-4 rounded-2xl bg-[#fdfaf3] border border-amber-200/80 shadow-2xs">
+            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">
+              Membership Disbursements (Sent)
+            </span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-rose-700 block mt-1">
+              {orgConfig.currencySymbol} {totalExpense.toLocaleString()}
+            </span>
+            <span className="text-xs text-rose-700 font-medium mt-1 block">
+              Organizational operational expenditures
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-950 text-white border border-amber-400/80 shadow-2xs">
+            <span className="text-[11px] text-emerald-300 font-bold uppercase tracking-wider block">
+              Membership Net Reserve
+            </span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 block mt-1">
+              {orgConfig.currencySymbol} {netBalance.toLocaleString()}
+            </span>
+            <span className="text-xs text-emerald-200 font-medium mt-1 block">
+              Available liquid balance
+            </span>
+          </div>
         </div>
       </section>
 
@@ -321,13 +390,47 @@ export const DashboardView: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.href = `/dashboard/sheets/${activeSheetTabId || 'sheet1'}`;
+                } else {
+                  setActiveTab('sheets');
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer"
+              title="Select how many sheets you need and save directly to Neon PostgreSQL database"
+            >
+              <span>⚡ Multi-Sheet Creator</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                setIsSavingDb(true);
+                const success = await saveAllSheetsToDatabase();
+                setIsSavingDb(false);
+                if (success) {
+                  setDbSuccessToast(`All ${sheetTabs.length} sheets successfully saved to Neon PostgreSQL Database!`);
+                  setTimeout(() => setDbSuccessToast(null), 4000);
+                } else {
+                  alert('Error saving sheets to database.');
+                }
+              }}
+              disabled={isSavingDb}
+              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-blue-400/80 cursor-pointer disabled:opacity-50"
+              title="Save all active sheets to Neon PostgreSQL Database"
+            >
+              <Database className="w-3.5 h-3.5 text-blue-200" />
+              <span>{isSavingDb ? 'Saving...' : '💾 Save to DB'}</span>
+            </button>
+
             <button 
               onClick={() => createTemplateSheet()}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
             >
               <Plus className="w-4 h-4" />
-              <span>Create New Sheet</span>
+              <span>+ New Sheet</span>
             </button>
           </div>
         </div>
@@ -357,7 +460,19 @@ export const DashboardView: React.FC = () => {
                   <h3 className="font-black text-slate-900 text-sm sm:text-base">
                     {sheet.name || `Sheet ${sheetNumber}`}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    {sheet.cityName && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        📍 {sheet.cityName}
+                      </span>
+                    )}
+                    {sheet.projectYear && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                        {sheet.projectYear}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 font-mono mt-1">
                     URL: /dashboard/sheets/{sheet.id}
                   </p>
                 </div>
@@ -512,6 +627,21 @@ export const DashboardView: React.FC = () => {
           </table>
         </div>
       </section>
+
+      {/* Database Save Success Notification Toast */}
+      {dbSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-emerald-400 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-400/40">
+            <Check className="w-5 h-5 stroke-[3]" />
+          </div>
+          <div>
+            <div className="font-black text-white text-sm">Neon PostgreSQL Database Synced!</div>
+            <div className="text-emerald-200 text-xs mt-0.5">
+              {dbSuccessToast}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

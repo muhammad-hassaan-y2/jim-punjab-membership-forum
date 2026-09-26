@@ -10,11 +10,18 @@ export async function POST(req: Request) {
       for (let i = 0; i < sheets.length; i++) {
         const s = sheets[i];
         await sql`
-          INSERT INTO sheet_tabs (id, name, name_urdu, category_filter, type_filter, color, period_type, period_value, sort_order)
+          INSERT INTO sheet_tabs (
+            id, name, name_urdu, project_id, project_name, project_year, city_name,
+            category_filter, type_filter, color, period_type, period_value, sort_order
+          )
           VALUES (
             ${s.id}, 
             ${s.name}, 
             ${s.nameUrdu || s.name}, 
+            ${s.projectId || null},
+            ${s.projectName || null},
+            ${s.projectYear || null},
+            ${s.cityName || null},
             ${s.categoryFilter || null}, 
             ${s.typeFilter || null}, 
             ${s.color || '#0284c7'}, 

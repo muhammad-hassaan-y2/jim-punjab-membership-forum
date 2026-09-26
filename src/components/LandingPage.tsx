@@ -142,37 +142,37 @@ export const LandingPage: React.FC = () => {
               
               {/* Centered Arabic Title */}
               <div className="relative inline-block mx-auto">
-                <h1 className="font-arabic text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-emerald-950 dark:text-emerald-300 leading-tight tracking-normal">
-                  مرکز روح الاسلام
+                <h1 className="font-arabic text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-emerald-950 dark:text-emerald-300 leading-tight tracking-normal">
+                  جماعت اصلاح المسلمین پنجاب
                 </h1>
                 <div className="h-1 w-24 sm:w-32 mx-auto mt-2 rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
               </div>
 
               {/* English Name */}
               <h2 className="text-xs sm:text-sm md:text-base font-extrabold tracking-[0.2em] text-emerald-700 dark:text-emerald-400 uppercase pt-1">
-                MARKAZ ROOH UL ISLAM
+                JAMAAT ISLAHUL MUSLIMEEN PUNJAB • JIM PUNJAB
               </h2>
             </div>
 
             {/* 3. Subheading */}
             <h3 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug w-full text-center lg:text-left">
-              Complete Fund and Accounts Management.
+              Membership Fund & Punjab District Spreadsheets.
             </h3>
 
             {/* 4. Description Paragraph */}
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal leading-relaxed max-w-xl w-full text-center lg:text-left">
-              Centralized and transparent accounting for Markaz Rooh ul Islam. Manage funds, calculate donations, and track records efficiently, under the spiritual guidance of Hazrat Tahir Mehboob Sajjan Saeen.
+              Centralized accounts intelligence, member contribution tracking, and multi-city institutional spreadsheets for Jamaat Islahul Muslimeen Punjab (JIM Punjab). Campaign Year 2026.
             </p>
 
             {/* 5. Trust / Shariah Indicators with Golden-Cream Luxury Badges */}
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1 text-xs text-emerald-950 font-semibold">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
                 <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                Shariah-Compliant Funds
+                Dedicated Membership Fund
               </span>
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
                 <Sparkles className="w-4 h-4 text-amber-600" />
-                Instant Voucher Studio
+                Punjab City Working Sheets
               </span>
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300/80 shadow-xs text-amber-900 font-bold">
                 <Database className="w-4 h-4 text-emerald-700" />

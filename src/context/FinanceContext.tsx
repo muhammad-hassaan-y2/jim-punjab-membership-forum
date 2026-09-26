@@ -6,10 +6,11 @@ import {
   FundCategory, 
   OrganizationConfig, 
   AppTheme, 
-  AppLanguage,
-  DonorSummary,
-  SheetTab,
-  TransactionType
+  AppLanguage, 
+  DonorSummary, 
+  SheetTab, 
+  TransactionType,
+  FinancialProject
 } from '../types/finance';
 import { 
   defaultTransactions, 
@@ -20,24 +21,27 @@ import { convertNumberToUrduWords } from '../utils/urduNumberToWords';
 import { convertNumberToEnglishWords } from '../utils/englishNumberToWords';
 import { api, HealthResponse } from '../services/api';
 
+export const defaultProjects: FinancialProject[] = [
+  {
+    id: 'proj-2026',
+    name: 'JIM Punjab Campaign',
+    year: 2026,
+    description: 'Jamaat Islahul Muslimeen Punjab - 2026 Membership Drive',
+    targetAmount: 10000000,
+    createdAt: new Date().toISOString(),
+  }
+];
+
 export const rawBlankSheetTabs: SheetTab[] = [
-  { id: 'sheet1', name: 'Sheet 1', nameUrdu: 'Sheet 1', typeFilter: 'all', color: '#0284c7', periodType: 'template' },
+  { id: 'sheet1', name: 'Sheet 1', nameUrdu: 'Sheet 1', typeFilter: 'all', color: '#0284c7', periodType: 'template', projectId: 'proj-2026', projectYear: 2026 },
 ];
 
 export const jamiaTemplateTabs: SheetTab[] = [
-  { id: 'all', name: 'Sheet 1: All Records', nameUrdu: 'Sheet 1: All Records', typeFilter: 'all', color: '#0284c7', periodType: 'template' },
-  { id: 'zakat', name: 'Sheet 2: Zakat & Fitrana', nameUrdu: 'Sheet 2: Zakat & Fitrana', categoryFilter: 'zakat', typeFilter: 'income', color: '#059669', periodType: 'template' },
-  { id: 'membership', name: 'Sheet 3: Membership Dues', nameUrdu: 'Sheet 3: Membership Dues', categoryFilter: 'membership', typeFilter: 'income', color: '#2563eb', periodType: 'template' },
-  { id: 'construction', name: 'Sheet 4: Construction Fund', nameUrdu: 'Sheet 4: Construction Fund', categoryFilter: 'construction', typeFilter: 'income', color: '#ca8a04', periodType: 'template' },
-  { id: 'madrasa', name: 'Sheet 5: Madrasa & Education', nameUrdu: 'Sheet 5: Madrasa & Education', categoryFilter: 'madrasa', typeFilter: 'income', color: '#0d9488', periodType: 'template' },
-  { id: 'expenses', name: 'Sheet 6: Expenditures', nameUrdu: 'Sheet 6: Expenditures', typeFilter: 'expense', color: '#e11d48', periodType: 'template' },
+  { id: 'all', name: 'Sheet 1: Membership Ledger', nameUrdu: 'Sheet 1: ممبر شپ کھاتہ', categoryFilter: 'membership', typeFilter: 'all', color: '#059669', periodType: 'template', projectId: 'proj-2026', projectYear: 2026 },
 ];
 
 export const welfareTemplateTabs: SheetTab[] = [
-  { id: 'all', name: 'Sheet 1: Master Ledger', nameUrdu: 'Sheet 1: Master Ledger', typeFilter: 'all', color: '#0284c7', periodType: 'template' },
-  { id: 'donations', name: 'Sheet 2: General Donations', nameUrdu: 'Sheet 2: General Donations', categoryFilter: 'sadaqat', typeFilter: 'income', color: '#059669', periodType: 'template' },
-  { id: 'zakat_aid', name: 'Sheet 3: Zakat & Relief', nameUrdu: 'Sheet 3: Zakat & Relief', categoryFilter: 'zakat', typeFilter: 'income', color: '#ca8a04', periodType: 'template' },
-  { id: 'operations', name: 'Sheet 4: Operational Expenses', nameUrdu: 'Sheet 4: Operational Expenses', typeFilter: 'expense', color: '#e11d48', periodType: 'template' },
+  { id: 'all', name: 'Sheet 1: Master Membership Ledger', nameUrdu: 'Sheet 1: ممبر شپ کھاتہ', categoryFilter: 'membership', typeFilter: 'all', color: '#059669', periodType: 'template', projectId: 'proj-2026', projectYear: 2026 },
 ];
 
 export type SpreadsheetTemplate = 'blank' | 'jamia' | 'welfare' | 'periodic';
@@ -66,6 +70,23 @@ interface FinanceContextType {
   setSheetTabs: React.Dispatch<React.SetStateAction<SheetTab[]>>;
   activeSheetTabId: string;
   setActiveSheetTabId: (id: string) => void;
+  projects: FinancialProject[];
+  setProjects: React.Dispatch<React.SetStateAction<FinancialProject[]>>;
+  activeProjectId: string;
+  setActiveProjectId: (id: string) => void;
+  createProject: (name: string, year: number | string, description?: string) => FinancialProject;
+  targetToCollect: number;
+  setTargetToCollect: (target: number) => void;
+  totalPledgedTarget: number;
+  totalDonorsCount: number;
+  totalPaidCount: number;
+  monthlyPledgedSum: number;
+  quarterlyPledgedSum: number;
+  annuallyPledgedSum: number;
+  collectedIn2026: number;
+  totalIncome: number;
+  totalExpense: number;
+  netBalance: number;
   activeReceiptTransaction: Transaction | null;
   setActiveReceiptTransaction: (tx: Transaction | null) => void;
   activeTab: 'dashboard' | 'landing' | 'sheets' | 'receipt' | 'analytics' | 'donors';
@@ -79,13 +100,15 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => Promise<void>;
   duplicateTransaction: (id: string) => Promise<void>;
   clearAllTransactions: () => Promise<void>;
-  addSheetTab: (name: string, categoryFilter?: string, typeFilter?: TransactionType | 'all') => Promise<void>;
+  addSheetTab: (name: string, categoryFilter?: string, typeFilter?: TransactionType | 'all', cityName?: string) => Promise<void>;
   deleteSheetTab: (id: string) => Promise<void>;
   loadTemplate: (template: SpreadsheetTemplate) => Promise<void>;
-  createRawBlankSheet: () => Promise<void>;
-  createTemplateSheet: (name?: string) => Promise<void>;
+  createRawBlankSheet: (name?: string, cityName?: string) => Promise<void>;
+  createTemplateSheet: (name?: string, cityName?: string) => Promise<void>;
   createPeriodicLedger: (params: PeriodicLedgerParams) => Promise<void>;
   renameSheetTab: (id: string, name: string) => void;
+  batchCreateAndSaveSheets: (count: number, cityNames?: string[], format?: 'template' | 'raw', baseName?: string) => Promise<SheetTab[]>;
+  saveAllSheetsToDatabase: () => Promise<boolean>;
   addCategory: (cat: Omit<FundCategory, 'id'>) => void;
   updateCategory: (id: string, cat: Partial<FundCategory>) => void;
   deleteCategory: (id: string) => void;
@@ -95,9 +118,6 @@ interface FinanceContextType {
   resetToDefaultData: () => void;
   importBackupData: (data: any) => boolean;
   donorsSummary: DonorSummary[];
-  totalIncome: number;
-  totalExpense: number;
-  netBalance: number;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
   isPeriodicModalOpen: boolean;
@@ -187,6 +207,77 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
   const [activeReceiptTransaction, setActiveReceiptTransaction] = useState<Transaction | null>(null);
 
+  // Projects State & Active Project Filter
+  const [projects, setProjects] = useState<FinancialProject[]>(() => {
+    if (typeof window === 'undefined') return defaultProjects;
+    try {
+      const saved = localStorage.getItem('jamia_projects');
+      return saved ? JSON.parse(saved) : defaultProjects;
+    } catch {
+      return defaultProjects;
+    }
+  });
+
+  const [activeProjectId, setActiveProjectIdState] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'proj-2026';
+    try {
+      const saved = localStorage.getItem('jamia_active_project_id');
+      return saved || 'proj-2026';
+    } catch {
+      return 'proj-2026';
+    }
+  });
+
+  const setActiveProjectId = (id: string) => {
+    setActiveProjectIdState(id);
+    try {
+      localStorage.setItem('jamia_active_project_id', id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createProject = (name: string, year: number | string = 2026, description?: string): FinancialProject => {
+    const newProj: FinancialProject = {
+      id: `proj-${Date.now()}`,
+      name: name.trim() || `Project ${year}`,
+      year: year,
+      description: description || '',
+      targetAmount: 10000000,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newProj, ...projects];
+    setProjects(updated);
+    setActiveProjectId(newProj.id);
+    try {
+      localStorage.setItem('jamia_projects', JSON.stringify(updated));
+      localStorage.setItem('jamia_active_project_id', newProj.id);
+    } catch (e) {
+      console.error(e);
+    }
+    return newProj;
+  };
+
+  // Target Goal to Collect
+  const [targetToCollect, setTargetToCollectState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 10000000;
+    try {
+      const saved = localStorage.getItem('jamia_target_to_collect');
+      return saved ? Number(saved) : 10000000;
+    } catch {
+      return 10000000;
+    }
+  });
+
+  const setTargetToCollect = (val: number) => {
+    setTargetToCollectState(val);
+    try {
+      localStorage.setItem('jamia_target_to_collect', String(val));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPeriodicModalOpen, setIsPeriodicModalOpen] = useState(false);
@@ -243,7 +334,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       if (dbConfig.status === 'fulfilled' && dbConfig.value) {
-        setOrgConfig(dbConfig.value);
+        setOrgConfig({
+          ...defaultOrgConfig,
+          ...dbConfig.value,
+          nameEnglish: 'JIM Punjab',
+          subHeaderEnglish: 'Jamaat Islahul Muslimeen Punjab',
+          nameUrdu: 'جماعت اصلاح المسلمین پنجاب',
+          subHeaderUrdu: 'پنجاب زون (Punjab Zone)',
+        });
       }
     } catch (err) {
       console.error('Failed to load from Neon DB:', err);
@@ -311,10 +409,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Start with a 100% Raw Blank Spreadsheet (Excel / Google Sheet Grid)
-  const createRawBlankSheet = async () => {
+  const createRawBlankSheet = async (name?: string, cityName?: string) => {
     setActiveTemplate('blank');
-    const tabName = `Sheet ${sheetTabs.length + 1}`;
+    const tabName = name || (cityName ? `${cityName} Worksheet` : `Sheet ${sheetTabs.length + 1}`);
     const tabId = `sheet-${Date.now()}`;
+    const curProj = projects.find(p => p.id === activeProjectId) || projects[0];
     const newTab: SheetTab = {
       id: tabId,
       name: tabName,
@@ -323,6 +422,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       color: '#0284c7',
       isCustom: true,
       periodType: 'raw',
+      projectId: activeProjectId,
+      projectName: curProj?.name,
+      projectYear: curProj?.year || 2026,
+      cityName: cityName || undefined,
     };
     const updated = [...sheetTabs, newTab];
     setSheetTabs(updated);
@@ -339,10 +442,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Create an Excel Sheet Template with standard 9 columns & fund options pre-populated
-  const createTemplateSheet = async (name?: string) => {
+  const createTemplateSheet = async (name?: string, cityName?: string) => {
     setActiveTemplate('blank');
-    const tabName = name || `Sheet ${sheetTabs.length + 1}`;
+    const tabName = name || (cityName ? `${cityName} Ledger` : `Sheet ${sheetTabs.length + 1}`);
     const tabId = `sheet-${Date.now()}`;
+    const curProj = projects.find(p => p.id === activeProjectId) || projects[0];
     const newTab: SheetTab = {
       id: tabId,
       name: tabName,
@@ -351,6 +455,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       color: '#0284c7',
       isCustom: true,
       periodType: 'template',
+      projectId: activeProjectId,
+      projectName: curProj?.name,
+      projectYear: curProj?.year || 2026,
+      cityName: cityName || undefined,
     };
     const updated = [...sheetTabs, newTab];
     setSheetTabs(updated);
@@ -484,6 +592,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const dd = String(now.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
+    const activeTab = sheetTabs.find(t => t.id === activeSheetTabId);
+    const defaultBranch = activeTab?.name || 'Main Branch';
+    const defaultZila = activeTab?.cityName || 'Lahore';
+
     for (let i = 0; i < count; i++) {
       const receiptNo = String(startNum + i);
       newRows.push({
@@ -492,19 +604,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         date: todayStr,
         donorName: '',
         donorNameUrdu: '',
+        branchName: defaultBranch,
+        zila: defaultZila,
         phone: '',
         address: '',
-        city: '',
+        city: defaultZila,
         reference: '',
         preferredPeriod: 'Monthly',
         monthlyAmount: 0,
         quarterlyAmount: 0,
         halfYearlyAmount: 0,
         annuallyAmount: 0,
+        monthsData: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 },
         amount: 0,
         amountInWordsUrdu: '',
         amountInWordsEnglish: '',
-        categoryId: categories[0]?.id || 'general',
+        categoryId: 'membership',
         paymentMode: 'Cash',
         bankName: '',
         chequeOrTxnNo: '',
@@ -534,12 +649,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions(prev => prev.map(item => {
       if (item.id === id) {
         const updated = { ...item, ...txData };
-        if (txData.amount !== undefined && txData.amount !== item.amount) {
+
+        // If monthsData is updated, compute total paid sum across 12 months
+        if (txData.monthsData !== undefined) {
+          const sumMonths = Object.values(updated.monthsData || {}).reduce(
+            (sum: number, v: any) => sum + (Number(v) || 0), 
+            0
+          );
+          if (sumMonths > 0 || txData.amount === undefined) {
+            updated.amount = sumMonths;
+            updated.amountInWordsUrdu = convertNumberToUrduWords(sumMonths);
+            updated.amountInWordsEnglish = convertNumberToEnglishWords(sumMonths);
+          }
+        } else if (txData.amount !== undefined && txData.amount !== item.amount) {
           const num = Number(txData.amount) || 0;
           updated.amount = num;
           updated.amountInWordsUrdu = convertNumberToUrduWords(num);
           updated.amountInWordsEnglish = convertNumberToEnglishWords(num);
         }
+
         if (activeReceiptTransaction?.id === id) {
           setActiveReceiptTransaction(updated);
         }
@@ -614,17 +742,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Sheet Tabs Management
-  const addSheetTab = async (name?: string, categoryFilter?: string) => {
+  const addSheetTab = async (name?: string, categoryFilter?: string, typeFilter: TransactionType | 'all' = 'all', cityName?: string) => {
     const nextNumber = sheetTabs.length + 1;
-    const tabName = name || `Sheet ${nextNumber}`;
+    const tabName = name || (cityName ? `${cityName} Worksheet` : `Sheet ${nextNumber}`);
+    const curProj = projects.find(p => p.id === activeProjectId) || projects[0];
     const newTab: SheetTab = {
       id: `sheet-${Date.now()}`,
       name: tabName,
       nameUrdu: tabName,
       categoryFilter,
-      typeFilter: 'all',
+      typeFilter: typeFilter || 'all',
       isCustom: true,
       color: '#0284c7',
+      projectId: activeProjectId,
+      projectName: curProj?.name,
+      projectYear: curProj?.year || 2026,
+      cityName: cityName || undefined,
     };
     const updated = [...sheetTabs, newTab];
     setSheetTabs(updated);
@@ -646,6 +779,69 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = sheetTabs.map(t => t.id === id ? { ...t, name, nameUrdu: name } : t);
     setSheetTabs(updated);
     await api.syncSheets(updated);
+  };
+
+  // Batch create multiple sheets and save directly to Neon PostgreSQL database
+  const batchCreateAndSaveSheets = async (
+    count: number,
+    cityNames?: string[],
+    format: 'template' | 'raw' = 'template',
+    baseName?: string
+  ): Promise<SheetTab[]> => {
+    setDbStatus('syncing');
+    const curProj = projects.find(p => p.id === activeProjectId) || projects[0];
+    const newTabs: SheetTab[] = [];
+    const startNum = sheetTabs.length + 1;
+
+    for (let i = 0; i < count; i++) {
+      const city = cityNames && cityNames[i] ? cityNames[i].trim() : undefined;
+      const tabName = city ? `${city} Worksheet` : (baseName ? `${baseName} ${i + 1}` : `Sheet ${startNum + i}`);
+      const tabId = `sheet-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`;
+      newTabs.push({
+        id: tabId,
+        name: tabName,
+        nameUrdu: tabName,
+        typeFilter: 'all',
+        color: '#0284c7',
+        isCustom: true,
+        periodType: format,
+        projectId: activeProjectId,
+        projectName: curProj?.name,
+        projectYear: curProj?.year || 2026,
+        cityName: city,
+      });
+    }
+
+    const updated = [...sheetTabs, ...newTabs];
+    setSheetTabs(updated);
+    if (newTabs.length > 0) {
+      setActiveSheetTabId(newTabs[0].id);
+    }
+    setActiveTab('sheets');
+
+    try {
+      await api.syncSheets(updated);
+      setDbStatus('connected');
+    } catch (err) {
+      console.error('Failed to save batch sheets in Neon DB:', err);
+      setDbStatus('error');
+      throw err;
+    }
+    return newTabs;
+  };
+
+  // Explicitly commit and save all active sheets to Neon PostgreSQL database
+  const saveAllSheetsToDatabase = async (): Promise<boolean> => {
+    setDbStatus('syncing');
+    try {
+      await api.syncSheets(sheetTabs);
+      setDbStatus('connected');
+      return true;
+    } catch (err) {
+      console.error('Failed to save all sheets to Neon DB:', err);
+      setDbStatus('error');
+      return false;
+    }
   };
 
   const addCategory = async (catData: Omit<FundCategory, 'id'>) => {
@@ -703,14 +899,82 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Aggregated calculations
-  const totalIncome = transactions
-    .filter(t => t.type === 'income' && t.status !== 'cancelled')
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  // Aggregated calculations across all transactions (including 12-month ledger data and pledged targets)
+  const { 
+    totalIncome, 
+    totalExpense, 
+    totalPledgedTarget, 
+    collectedIn2026, 
+    totalDonorsCount, 
+    totalPaidCount,
+    monthlyPledgedSum,
+    quarterlyPledgedSum,
+    annuallyPledgedSum,
+  } = React.useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    let pledged = 0;
+    let in2026 = 0;
+    let donors = 0;
+    let paidDonors = 0;
+    let monthlySum = 0;
+    let quarterlySum = 0;
+    let annuallySum = 0;
 
-  const totalExpense = transactions
-    .filter(t => t.type === 'expense' && t.status !== 'cancelled')
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    transactions.forEach(t => {
+      if (t.status === 'cancelled') return;
+
+      if (t.type === 'expense') {
+        expense += Number(t.amount || 0);
+        return;
+      }
+
+      donors++;
+      monthlySum += Number(t.monthlyAmount || 0);
+      quarterlySum += Number(t.quarterlyAmount || 0);
+      annuallySum += Number(t.annuallyAmount || 0);
+
+      // 1. Calculate Pledged Target:
+      const target = (t.annuallyAmount && Number(t.annuallyAmount) > 0)
+        ? Number(t.annuallyAmount)
+        : ((t.quarterlyAmount && Number(t.quarterlyAmount) > 0)
+            ? Number(t.quarterlyAmount) * 4
+            : ((t.monthlyAmount && Number(t.monthlyAmount) > 0) 
+                ? Number(t.monthlyAmount) * 12 
+                : Number(t.amount || 0)));
+      pledged += target;
+
+      // 2. Calculate Total Collected from this donor across 12 months & amount column:
+      const months = t.monthsData || {};
+      const sumMonths = Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0);
+      const rowPaid = sumMonths > 0 ? sumMonths : Number(t.amount || 0);
+      income += rowPaid;
+      if (rowPaid > 0) {
+        paidDonors++;
+      }
+
+      // 3. Collected in 2026:
+      // The 12 monthly columns are exclusively the 2026 accounting year contributions.
+      // Also transactions with date in 2026 or without date (defaulting to 2026):
+      if (sumMonths > 0) {
+        in2026 += sumMonths;
+      } else if (!t.date || t.date.startsWith('2026')) {
+        in2026 += rowPaid;
+      }
+    });
+
+    return {
+      totalIncome: income,
+      totalExpense: expense,
+      totalPledgedTarget: pledged,
+      collectedIn2026: in2026,
+      totalDonorsCount: donors,
+      totalPaidCount: paidDonors,
+      monthlyPledgedSum: monthlySum,
+      quarterlyPledgedSum: quarterlySum,
+      annuallyPledgedSum: annuallySum,
+    };
+  }, [transactions]);
 
   const netBalance = totalIncome - totalExpense;
 
@@ -770,6 +1034,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSheetTabs,
         activeSheetTabId,
         setActiveSheetTabId,
+        projects,
+        setProjects,
+        activeProjectId,
+        setActiveProjectId,
+        createProject,
+        targetToCollect,
+        setTargetToCollect,
+        collectedIn2026,
         activeTemplate,
         setActiveTemplate,
         loadTemplate,
@@ -779,6 +1051,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addSheetTab,
         deleteSheetTab,
         renameSheetTab,
+        batchCreateAndSaveSheets,
+        saveAllSheetsToDatabase,
         activeTab,
         setActiveTab,
         activeReceiptTransaction,
@@ -802,6 +1076,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         totalIncome,
         totalExpense,
         netBalance,
+        totalPledgedTarget,
+        totalDonorsCount,
+        totalPaidCount,
+        monthlyPledgedSum,
+        quarterlyPledgedSum,
+        annuallyPledgedSum,
         isSettingsOpen,
         setIsSettingsOpen,
         isPeriodicModalOpen,

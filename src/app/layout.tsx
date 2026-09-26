@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Financial Record Keeper - Accounting & Spreadsheets',
-  description: 'Enterprise Accounting, Google Sheet Clone, and Institutional Record Keeping System backed by Neon PostgreSQL',
+  title: 'JIM Punjab Membership Forum - Institutional Accounting & Spreadsheets',
+  description: 'Jamaat Islahul Muslimeen Punjab (JIM Punjab) Membership Forum & Fund - Official 26-Column Institutional Accounting Ledger & Worksheets System backed by Neon PostgreSQL',
 };
 
 export default function RootLayout({
