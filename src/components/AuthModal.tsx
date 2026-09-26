@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { X, Lock, Mail, ShieldCheck, ArrowRight, KeyRound, Sparkles, Copy, Check } from 'lucide-react';
+import { X, Lock, Mail, ShieldCheck, ArrowRight, KeyRound, Copy, Check } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -41,23 +41,6 @@ export const AuthModal: React.FC = () => {
     } catch (err: any) {
       setIsLoading(false);
       setError(err?.message || 'Authentication failed. Please verify your credentials.');
-    }
-  };
-
-  const handleAutoFillAndLogin = async (fillEmail: string, fillPass: string) => {
-    setEmail(fillEmail);
-    setPassword(fillPass);
-    setIsLoading(true);
-    setError(null);
-    try {
-      await login(fillEmail, fillPass);
-      setIsLoading(false);
-      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-        window.location.href = '/dashboard';
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      setError(err?.message || 'Login failed');
     }
   };
 
@@ -120,24 +103,16 @@ export const AuthModal: React.FC = () => {
                 {copied ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => handleAutoFillAndLogin('ali@markaz.com', 'Ali@2026')}
-                className="px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 text-[10px] font-black shadow-xs hover:from-amber-300 hover:to-amber-400 flex items-center gap-1 cursor-pointer"
-              >
-                <Sparkles className="w-3 h-3 text-emerald-950" />
-                <span>1-Click</span>
-              </button>
             </div>
           </div>
           <div className="text-[10px] text-slate-500 flex justify-between pt-1 border-t border-amber-200/50">
             <span>Admin fallback: <span className="font-mono text-slate-700">admin@markaz.com</span></span>
             <button
               type="button"
-              onClick={() => handleAutoFillAndLogin('admin@markaz.com', 'Markaz@2026')}
+              onClick={() => handleCopyCredentials('admin@markaz.com', 'Markaz@2026')}
               className="text-amber-800 hover:underline font-bold cursor-pointer"
             >
-              Sign in as Admin &rarr;
+              Copy
             </button>
           </div>
         </div>
