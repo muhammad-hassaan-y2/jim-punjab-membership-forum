@@ -87,6 +87,22 @@ export const api = {
     if (!res.ok) throw new Error('Failed to sync sheet tabs');
   },
 
+  async deleteSheet(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/sheets?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete sheet from Neon DB');
+  },
+
+  async updateSheet(id: string, updates: { name?: string; cityName?: string; nameUrdu?: string }): Promise<void> {
+    const res = await fetch(`${BASE_URL}/sheets`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    });
+    if (!res.ok) throw new Error('Failed to update sheet in Neon DB');
+  },
+
   // Categories
   async getCategories(): Promise<FundCategory[]> {
     const res = await fetch(`${BASE_URL}/categories`);

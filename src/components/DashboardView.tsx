@@ -16,7 +16,9 @@ import {
   CheckCircle2,
   Search,
   Sparkles,
-  MapPin
+  MapPin,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { JIM_PUNJAB_DISTRICTS_ZONES } from '../data/punjabDistricts';
 
@@ -25,6 +27,8 @@ export const DashboardView: React.FC = () => {
     sheetTabs, 
     activeSheetTabId, 
     setActiveSheetTabId, 
+    deleteSheetTab,
+    renameSheetTab,
     batchCreateAndSaveSheets,
     setActiveTab,
     transactions,
@@ -43,6 +47,8 @@ export const DashboardView: React.FC = () => {
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(targetToCollect.toString());
   const [dbSuccessToast, setDbSuccessToast] = useState<string | null>(null);
+  const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
+  const [editingSheetName, setEditingSheetName] = useState<string>('');
 
   // Search & Filter state for the 55 working sheets
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +99,35 @@ export const DashboardView: React.FC = () => {
       setCopiedSheetId(sheetId);
       setTimeout(() => setCopiedSheetId(null), 2500);
     }
+  };
+
+  const handleStartEditSheet = (sheet: any) => {
+    setEditingSheetId(sheet.id);
+    setEditingSheetName(sheet.cityName || sheet.name);
+  };
+
+  const handleSaveEditSheet = async (sheetId: string) => {
+    const trimmed = editingSheetName.trim();
+    if (trimmed) {
+      // Zila and City are same: updating sheet name also sets cityName
+      await renameSheetTab(sheetId, trimmed, trimmed);
+      setDbSuccessToast(`Sheet & City updated to "${trimmed}".`);
+      setTimeout(() => setDbSuccessToast(null), 3000);
+    }
+    setEditingSheetId(null);
+  };
+
+  const handleDeleteSheet = async (sheet: any) => {
+    if (window.confirm(`Are you sure you want to delete sheet "${sheet.name}"?`)) {
+      await deleteSheetTab(sheet.id);
+      setDbSuccessToast(`Sheet "${sheet.name}" deleted.`);
+      setTimeout(() => setDbSuccessToast(null), 3000);
+    }
+  };
+
+  const handleRemoveSheetFromProject = (idxToRemove: number) => {
+    setSheetNames(prev => prev.filter((_, i) => i !== idxToRemove));
+    setProjectSheetCount(prev => Math.max(1, prev - 1));
   };
 
   const handleUpdateSheetCount = (count: number) => {
@@ -529,34 +564,78 @@ export const DashboardView: React.FC = () => {
                     >
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-900 font-black font-mono text-[11px] flex items-center justify-center">
-                            {itemIndex}
-                          </span>
-                          {isCurrentlyActive && (
-                            <span className="px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              Active
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-900 font-black font-mono text-[11px] flex items-center justify-center">
+                              {itemIndex}
                             </span>
-                          )}
+                            {isCurrentlyActive && (
+                              <span className="px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Top-right quick delete */}
+                          <button
+                            onClick={() => handleDeleteSheet(sheet)}
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title={`Delete sheet "${sheet.name}"`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
-                        <div className="font-arabic font-bold text-amber-900 text-sm dir-rtl truncate">
-                          {sheet.nameUrdu || sheet.name}
-                        </div>
-                        <h3 className="font-bold text-slate-900 text-xs truncate mt-0.5">
-                          {sheet.name}
-                        </h3>
+                        {editingSheetId === sheet.id ? (
+                          <div className="my-2 p-2 bg-white rounded-xl border-2 border-emerald-500 shadow-xs">
+                            <label className="text-[10px] font-bold text-emerald-950 block mb-1">
+                              Edit Sheet & City / Zila (ضلع / شہر):
+                            </label>
+                            <input
+                              type="text"
+                              value={editingSheetName}
+                              onChange={(e) => setEditingSheetName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditSheet(sheet.id);
+                                if (e.key === 'Escape') setEditingSheetId(null);
+                              }}
+                              autoFocus
+                              className="w-full text-xs font-bold px-2 py-1 border border-slate-300 rounded mb-2 text-slate-900 bg-slate-50 focus:bg-white focus:outline-emerald-600"
+                            />
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button
+                                onClick={() => handleSaveEditSheet(sheet.id)}
+                                className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 cursor-pointer"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingSheetId(null)}
+                                className="px-2 py-1 rounded bg-slate-200 text-slate-700 font-bold text-[11px] hover:bg-slate-300 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-arabic font-bold text-amber-900 text-sm dir-rtl truncate">
+                              {sheet.nameUrdu || sheet.name}
+                            </div>
+                            <h3 className="font-bold text-slate-900 text-xs truncate mt-0.5">
+                              {sheet.name}
+                            </h3>
 
-                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                          {sheet.cityName && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5">
-                              <MapPin className="w-2.5 h-2.5" />
-                              <span>{sheet.cityName}</span>
-                            </span>
-                          )}
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
-                            26 Cols (A-Z)
-                          </span>
-                        </div>
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5">
+                                <MapPin className="w-2.5 h-2.5 text-amber-700" />
+                                <span>ضلع / City: {sheet.cityName || sheet.name}</span>
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
+                                26 Cols (A-Z)
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between gap-1.5">
@@ -569,6 +648,14 @@ export const DashboardView: React.FC = () => {
                         </button>
 
                         <button
+                          onClick={() => handleStartEditSheet(sheet)}
+                          className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer"
+                          title="Edit Sheet & City Name"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+
+                        <button
                           onClick={() => handleCopyShareLink(sheet.id)}
                           className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-emerald-700 transition-colors cursor-pointer"
                           title="Copy direct shareable link"
@@ -578,6 +665,14 @@ export const DashboardView: React.FC = () => {
                           ) : (
                             <Share2 className="w-3 h-3" />
                           )}
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteSheet(sheet)}
+                          className="p-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                          title="Delete Sheet"
+                        >
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
@@ -743,22 +838,32 @@ export const DashboardView: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 p-3 sm:p-4 bg-[#fdfaf3] rounded-2xl border border-amber-200/90 max-h-72 overflow-y-auto">
-                    {Array.from({ length: projectSheetCount }).map((_, idx) => (
-                      <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-900 font-bold font-mono text-xs flex items-center justify-center shrink-0">
-                          {idx}
-                        </span>
-                        <input
-                          type="text"
-                          value={sheetNames[idx] || ''}
-                          onChange={(e) => handleSheetNameChange(idx, e.target.value)}
-                          placeholder={`Sheet ${idx}`}
-                          className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold text-slate-800 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-emerald-700 rounded"
-                        />
-                      </div>
-                    ))}
-                  </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 p-3 sm:p-4 bg-[#fdfaf3] rounded-2xl border border-amber-200/90 max-h-72 overflow-y-auto">
+                      {Array.from({ length: projectSheetCount }).map((_, idx) => (
+                        <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2">
+                          <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-900 font-bold font-mono text-xs flex items-center justify-center shrink-0">
+                            {idx}
+                          </span>
+                          <input
+                            type="text"
+                            value={sheetNames[idx] || ''}
+                            onChange={(e) => handleSheetNameChange(idx, e.target.value)}
+                            placeholder={`Sheet ${idx}`}
+                            className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold text-slate-800 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-emerald-700 rounded"
+                          />
+                          {projectSheetCount > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSheetFromProject(idx)}
+                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                              title="Remove this sheet"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                 </div>
 
                 {/* 4. Shariah Format Confirmation */}

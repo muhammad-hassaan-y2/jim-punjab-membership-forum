@@ -106,7 +106,7 @@ interface FinanceContextType {
   createRawBlankSheet: (name?: string, cityName?: string) => Promise<void>;
   createTemplateSheet: (name?: string, cityName?: string) => Promise<void>;
   createPeriodicLedger: (params: PeriodicLedgerParams) => Promise<void>;
-  renameSheetTab: (id: string, name: string) => void;
+  renameSheetTab: (id: string, name: string, cityName?: string) => Promise<void>;
   batchCreateAndSaveSheets: (count: number, cityNames?: string[], format?: 'template' | 'raw', baseName?: string) => Promise<SheetTab[]>;
   saveAllSheetsToDatabase: () => Promise<boolean>;
   addCategory: (cat: Omit<FundCategory, 'id'>) => void;
@@ -766,19 +766,68 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteSheetTab = async (id: string) => {
-    if (sheetTabs.length <= 1) return;
     const updated = sheetTabs.filter(t => t.id !== id);
+    if (updated.length === 0) {
+      const fallbackTab: SheetTab = {
+        id: `sheet-${Date.now()}`,
+        name: 'New Sheet',
+        nameUrdu: 'نئی شیٹ',
+        cityName: 'New Sheet',
+        categoryFilter: 'membership',
+        typeFilter: 'all',
+        color: '#0284c7',
+        periodType: 'template',
+        sortOrder: 0
+      };
+      setSheetTabs([fallbackTab]);
+      setActiveSheetTabId(fallbackTab.id);
+      try {
+        await api.deleteSheet(id);
+      } catch (err) {
+        console.warn('Delete failed, syncing fallback:', err);
+      }
+      await api.syncSheets([fallbackTab]).catch(console.error);
+      return;
+    }
+
     setSheetTabs(updated);
     if (activeSheetTabId === id) {
       setActiveSheetTabId(updated[0].id);
     }
-    await api.syncSheets(updated);
+
+    try {
+      await api.deleteSheet(id);
+    } catch (err) {
+      console.warn('Direct delete failed, falling back to syncSheets:', err);
+      await api.syncSheets(updated).catch(console.error);
+    }
   };
 
-  const renameSheetTab = async (id: string, name: string) => {
-    const updated = sheetTabs.map(t => t.id === id ? { ...t, name, nameUrdu: name } : t);
+  const renameSheetTab = async (id: string, name: string, cityName?: string) => {
+    const finalName = name.trim();
+    // Zila and City are identical. In sheets, city name is the sheet name.
+    const finalCity = (cityName || finalName).trim();
+
+    const updated = sheetTabs.map(t => {
+      if (t.id === id) {
+        return { 
+          ...t, 
+          name: finalName, 
+          cityName: finalCity, 
+          nameUrdu: t.nameUrdu || finalName 
+        };
+      }
+      return t;
+    });
+
     setSheetTabs(updated);
-    await api.syncSheets(updated);
+
+    try {
+      await api.updateSheet(id, { name: finalName, cityName: finalCity });
+    } catch (err) {
+      console.warn('Direct update failed, syncing sheets:', err);
+      await api.syncSheets(updated).catch(console.error);
+    }
   };
 
   // Batch create multiple sheets and save directly to Neon PostgreSQL database

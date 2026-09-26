@@ -138,7 +138,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const handleSaveRename = async () => {
     const trimmed = sheetNameInput.trim();
     if (trimmed && trimmed !== currentSheetTitle) {
-      renameSheetTab(activeSheetTabId, trimmed);
+      // Zila and City are identical: updating sheet name also updates cityName
+      await renameSheetTab(activeSheetTabId, trimmed, trimmed);
       try {
         localStorage.setItem(`jamia_sheet_name_${activeSheetTabId}`, trimmed);
         await fetch(`/api/shared/${activeSheetTabId}`, {
@@ -380,7 +381,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     { letter: 'B', key: 'date', titleEn: 'Date', titleUr: 'تاریخ', width: 'w-24', align: 'center' },
     { letter: 'C', key: 'donorName', titleEn: 'Donor Name', titleUr: 'نام دہندہ', width: 'w-48' },
     { letter: 'D', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
-    { letter: 'E', key: 'zila', titleEn: 'Zila', titleUr: 'ضلع', width: 'w-28' },
+    { letter: 'E', key: 'zila', titleEn: 'Zila / City', titleUr: 'ضلع / شہر', width: 'w-28' },
     { letter: 'F', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
     { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
     { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
@@ -1429,15 +1430,36 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1.5 group">
-                      <h2 
-                        onClick={handleStartRename}
-                        className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 py-0.5 px-1 -mx-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                        title="Click to rename this sheet"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5 group">
+                        <h2 
+                          onClick={handleStartRename}
+                          className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 py-0.5 px-1 -mx-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                          title="Click to rename Sheet & City / Zila Name"
+                        >
+                          <span>{currentSheetTitle}</span>
+                          <Pencil className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 text-slate-400 group-hover:text-blue-600 transition-opacity" />
+                        </h2>
+                      </div>
+
+                      {/* City / Zila badge */}
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-amber-600" />
+                        <span>ضلع / City: {currentSheetTab?.cityName || currentSheetTitle}</span>
+                      </span>
+
+                      {/* Delete Sheet Button */}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to delete sheet "${currentSheetTitle}"?`)) {
+                            deleteSheetTab(activeSheetTabId);
+                          }
+                        }}
+                        className="p-1 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950 hover:text-rose-700 transition-colors cursor-pointer"
+                        title="Delete this sheet"
                       >
-                        <span>{currentSheetTitle}</span>
-                        <Pencil className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 text-slate-400 group-hover:text-blue-600 transition-opacity" />
-                      </h2>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   )}
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300">
@@ -2955,7 +2977,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                 >
                   <FileSpreadsheet className={`w-3.5 h-3.5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span>{tab.name || `Sheet ${sheetNum}`}</span>
-                  {tab.cityName && (
+                  {tab.cityName && !tab.name.toLowerCase().includes(tab.cityName.toLowerCase()) && (
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold">
                       📍 {tab.cityName}
                     </span>
@@ -2967,12 +2989,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteSheetTab(tab.id);
+                        if (window.confirm(`Are you sure you want to delete sheet "${tab.name}"?`)) {
+                          deleteSheetTab(tab.id);
+                        }
                       }}
-                      className="opacity-0 group-hover:opacity-100 hover:text-rose-500 text-slate-400 p-0.5 ml-1"
-                      title="Close Tab"
+                      className="opacity-40 group-hover:opacity-100 hover:text-rose-600 text-slate-400 p-0.5 ml-1 transition-opacity cursor-pointer"
+                      title="Delete Sheet"
                     >
-                      <X className="w-3 h-3" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   )}
                 </div>
