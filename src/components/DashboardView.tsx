@@ -55,13 +55,22 @@ export const DashboardView: React.FC = () => {
   ]);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
-  // Prevent background scrolling when modal is open
+  // Prevent background scrolling and enable Escape key to close
   useEffect(() => {
     if (isCreateProjectModalOpen) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setIsCreateProjectModalOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+
       return () => {
         document.body.style.overflow = originalOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
       };
     }
   }, [isCreateProjectModalOpen]);
@@ -473,162 +482,214 @@ export const DashboardView: React.FC = () => {
       </section>
 
       {/* ====================================================================
-          CREATE SHEET PROJECT MODAL DIALOG
-          - Fixed to top without excessive upward gap
-          - Body scroll locked when open
-          - Click backdrop to close
+          CREATE SHEET PROJECT - FULL SCREEN DEDICATED WORKSPACE
+          - 100% full screen (fixed inset-0 w-screen h-screen)
+          - Zero gap on top, zero gap on sides
+          - Clean scrollable content area
+          - Full keyboard ESC support & Close button
           ==================================================================== */}
       {isCreateProjectModalOpen && (
         <div 
-          className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-3 sm:p-5 pt-6 sm:pt-10 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => setIsCreateProjectModalOpen(false)}
+          className="fixed inset-0 z-[100] w-screen h-screen bg-[#fdfaf3] flex flex-col overflow-hidden animate-in fade-in duration-200"
         >
-          <div 
-            className="relative w-full max-w-xl rounded-3xl bg-white border-2 border-amber-400 shadow-2xl overflow-hidden flex flex-col my-auto max-h-[calc(100vh-3rem)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-950 text-white p-5 sm:p-6 border-b border-amber-400/40 relative shrink-0">
-              <button
-                onClick={() => setIsCreateProjectModalOpen(false)}
-                className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="font-arabic text-amber-300 text-sm font-bold">
-                نیا شیٹس پروجیکٹ بنائیں
+          {/* Top Bar - Full Width, zero gap at top */}
+          <header className="w-full bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-950 text-white px-4 sm:px-8 py-3.5 sm:py-4 border-b-2 border-amber-400 shadow-xl flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full p-0.5 bg-gradient-to-br from-emerald-800 via-emerald-950 to-[#011c15] border-2 border-amber-400 shadow-md flex items-center justify-center shrink-0">
+                <img src="/logo.png" alt="JIM Punjab" className="w-full h-full object-contain filter drop-shadow-sm" />
               </div>
-              <h2 className="text-xl font-black text-white mt-0.5">
-                Create Sheet Project
-              </h2>
-              <p className="text-xs text-emerald-200/90 mt-1">
-                Select how many sheets you need (e.g. 5–10) and name them below. All sheets follow the official 26-column accounting format and are saved directly to Neon DB.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-arabic text-amber-300 font-bold text-sm sm:text-base">
+                    جماعت اصلاح المسلمین پنجاب
+                  </span>
+                  <span className="text-amber-400/60 text-xs hidden sm:inline">✦</span>
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-300 hidden sm:inline">
+                    Sheet Project Creator
+                  </span>
+                </div>
+                <h1 className="text-base sm:text-lg font-black text-white leading-tight">
+                  Create Sheet Project &bull; ورکنگ شیٹس پروجیکٹ بنائیں
+                </h1>
+              </div>
             </div>
 
-            {/* Modal Body */}
-            <form onSubmit={handleCreateSheetProject} className="p-5 sm:p-6 space-y-4 overflow-y-auto bg-[#fdfaf3]">
+            <button
+              onClick={() => setIsCreateProjectModalOpen(false)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all cursor-pointer hover:scale-105 active:scale-95"
+              title="Close and return to Dashboard"
+            >
+              <X className="w-4 h-4 text-amber-300" />
+              <span>Close</span>
+            </button>
+          </header>
+
+          {/* Main Content Area - Full screen scrollable body */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-8">
+            <div className="max-w-4xl mx-auto space-y-6">
               
-              {/* Project Title */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Project Name / Campaign Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="JIM Punjab Membership Campaign 2026"
-                  className="w-full px-3.5 py-2 text-sm bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-700 font-semibold text-slate-800"
-                />
+              {/* Info banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-amber-300/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm sm:text-base font-black text-slate-900">
+                    Institutional Working Sheets Project Setup
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Select how many sheets you need (e.g. 5–10) and customize their names. All sheets will automatically follow the official 26-column Shariah accounting format and sync directly with Neon PostgreSQL DB.
+                  </p>
+                </div>
+                <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Neon DB Connected</span>
+                </div>
               </div>
 
-              {/* Sheet Count Selector (5-10 or custom) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  How Many Sheets? (Select 5–10)
-                </label>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  {[3, 5, 8, 10, 12, 15].map((count) => (
-                    <button
-                      key={count}
-                      type="button"
-                      onClick={() => handleUpdateSheetCount(count)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                        projectSheetCount === count
-                          ? 'bg-emerald-800 text-white border-2 border-amber-400 shadow-sm scale-105'
-                          : 'bg-white text-slate-700 border border-slate-300 hover:border-amber-400'
-                      }`}
-                    >
-                      {count} Sheets
-                    </button>
-                  ))}
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <span className="text-[11px] font-bold text-slate-500">Custom:</span>
+              {/* Form Card */}
+              <form onSubmit={handleCreateSheetProject} className="bg-white rounded-3xl border border-amber-300/80 p-6 sm:p-8 shadow-sm space-y-6">
+                
+                {/* 1. Project / Campaign Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    1. Campaign / Project Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="JIM Punjab Membership Campaign 2026"
+                    className="w-full px-4 py-2.5 text-sm sm:text-base bg-[#fdfaf3] border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-700 font-bold text-slate-900"
+                  />
+                </div>
+
+                {/* 2. Sheet Count Selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      2. How Many Sheets? (Select 5–10)
+                    </label>
+                    <span className="text-xs text-emerald-800 font-bold">
+                      Currently Selected: {projectSheetCount} Sheets
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                    {[3, 5, 8, 10, 12, 15].map((count) => {
+                      const isSelected = projectSheetCount === count;
+                      return (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => handleUpdateSheetCount(count)}
+                          className={`p-3 rounded-2xl text-center font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                            isSelected
+                              ? 'bg-gradient-to-br from-emerald-800 to-emerald-950 text-white border-2 border-amber-400 shadow-md scale-102 ring-2 ring-amber-400/30'
+                              : 'bg-[#fdfaf3] text-slate-700 border border-slate-300 hover:border-amber-400 hover:bg-amber-50/50'
+                          }`}
+                        >
+                          <span className="text-lg font-mono font-black">{count}</span>
+                          <span className="text-[11px] font-sans font-bold">Sheets</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100">
+                    <span className="text-xs font-bold text-slate-600">Or custom count (1–30):</span>
                     <input
                       type="number"
                       min={1}
                       max={30}
                       value={projectSheetCount}
                       onChange={(e) => handleUpdateSheetCount(Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 1)))}
-                      className="w-16 px-2 py-1 text-xs text-center font-bold bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                      className="w-20 px-3 py-1.5 text-xs text-center font-bold bg-[#fdfaf3] border border-amber-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700"
                     />
+                    <span className="text-[11px] text-slate-400">sheets total</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Option to Name the Sheets */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Name Each Sheet ({projectSheetCount} sheets)
-                  </label>
+                {/* 3. Sheet Naming Grid */}
+                <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2.5 gap-1.5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        3. Name Each Sheet ({projectSheetCount} Working Sheets)
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        Customize names for each division, district, or unit
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleResetToDistricts}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-900 underline cursor-pointer self-start sm:self-auto"
+                    >
+                      Reset to Punjab Districts (Lahore, Faisalabad...)
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 p-3 sm:p-4 bg-[#fdfaf3] rounded-2xl border border-amber-200/90 max-h-72 overflow-y-auto">
+                    {Array.from({ length: projectSheetCount }).map((_, idx) => (
+                      <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-900 font-bold font-mono text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={sheetNames[idx] || ''}
+                          onChange={(e) => handleSheetNameChange(idx, e.target.value)}
+                          placeholder={`Sheet ${idx + 1}`}
+                          className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold text-slate-800 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-emerald-700 rounded"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Shariah Format Confirmation */}
+                <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-sm">
+                      ✓ Standard 26-Column Shariah Accounting Format Guaranteed:
+                    </span>
+                    <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                      Every sheet in this project will automatically include the full 26-column ledger structure:
+                      <strong> Receipt # (A), Date (B), Donor Name (C), Branch Name (D), Zila (E), Phone (F), Monthly Commitment (G), Quarterly (H), Annual (I), 12 Monthly Payment Columns Jan–Dec (J–U), Total Paid (V), Payment Mode (W), Bank Name (X), Status (Y), Notes (Z)</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={handleResetToDistricts}
-                    className="text-[11px] font-bold text-emerald-800 hover:underline cursor-pointer"
+                    onClick={() => setIsCreateProjectModalOpen(false)}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                   >
-                    Reset to Punjab Districts
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isCreatingProject}
+                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/25 border-2 border-amber-400 cursor-pointer disabled:opacity-50 transition-all hover:scale-102 active:scale-98"
+                  >
+                    {isCreatingProject ? (
+                      <span>Saving to Neon Cloud Database...</span>
+                    ) : (
+                      <>
+                        <Database className="w-4 h-4 text-amber-300" />
+                        <span>Create Project & Save to DB</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
-                <div className="space-y-1.5 max-h-48 overflow-y-auto p-2.5 bg-white rounded-xl border border-amber-200">
-                  {Array.from({ length: projectSheetCount }).map((_, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="w-16 text-[11px] font-mono font-bold text-slate-500 shrink-0">
-                        Sheet {idx + 1}:
-                      </span>
-                      <input
-                        type="text"
-                        value={sheetNames[idx] || ''}
-                        onChange={(e) => handleSheetNameChange(idx, e.target.value)}
-                        placeholder={`e.g. ${PUNJAB_DISTRICTS[idx] || `District ${idx + 1}`}`}
-                        className="flex-1 px-3 py-1.5 text-xs bg-[#fdfaf3] border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700 font-medium"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </form>
 
-              {/* Shariah Accounting Format Confirmation */}
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200/80 text-xs text-emerald-950 flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-bold block">Standard 26-Column Format Confirmed:</span>
-                  <span className="text-[11px] text-emerald-800 leading-relaxed block mt-0.5">
-                    All {projectSheetCount} sheets will be formatted with the 26 columns: Receipt #, Date, Donor Name, Branch Name, Zila, Phone, Monthly/Quarterly/Annual Commitments, 12-Month Jan–Dec Columns, Total Paid, Payment Mode, Bank Name, and Notes.
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateProjectModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingProject}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/20 border border-amber-400 cursor-pointer disabled:opacity-50"
-                >
-                  {isCreatingProject ? (
-                    <span>Saving to Neon DB...</span>
-                  ) : (
-                    <>
-                      <Database className="w-4 h-4 text-amber-300" />
-                      <span>Create Project & Save to DB</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </form>
+            </div>
           </div>
         </div>
       )}
