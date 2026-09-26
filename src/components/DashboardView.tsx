@@ -13,14 +13,12 @@ import {
   Target, 
   Database,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Search,
+  Sparkles,
+  MapPin
 } from 'lucide-react';
-
-const PUNJAB_DISTRICTS = [
-  'Lahore', 'Faisalabad', 'Rawalpindi', 'Multan', 'Gujranwala', 
-  'Sialkot', 'Sargodha', 'Bahawalpur', 'Gujarat', 'Sahiwal',
-  'Sheikhupura', 'Jhang', 'Kasur', 'Rahim Yar Khan', 'Okara', 'Dera Ghazi Khan'
-];
+import { JIM_PUNJAB_DISTRICTS_ZONES } from '../data/punjabDistricts';
 
 export const DashboardView: React.FC = () => {
   const { 
@@ -46,13 +44,17 @@ export const DashboardView: React.FC = () => {
   const [tempTarget, setTempTarget] = useState(targetToCollect.toString());
   const [dbSuccessToast, setDbSuccessToast] = useState<string | null>(null);
 
+  // Search & Filter state for the 55 working sheets
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'all' | 'districts' | 'central' | 'wings'>('all');
+
   // Sheet Project Dialog state
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
-  const [projectSheetCount, setProjectSheetCount] = useState(5);
-  const [projectName, setProjectName] = useState('JIM Punjab Membership Campaign 2026');
-  const [sheetNames, setSheetNames] = useState<string[]>([
-    'Lahore', 'Faisalabad', 'Rawalpindi', 'Multan', 'Gujranwala'
-  ]);
+  const [projectSheetCount, setProjectSheetCount] = useState(55);
+  const [projectName, setProjectName] = useState('JIM Punjab Official Districts & Zones 2026 (فہرست اضلاع و زونز)');
+  const [sheetNames, setSheetNames] = useState<string[]>(() => 
+    JIM_PUNJAB_DISTRICTS_ZONES.map(d => `${d.en} (${d.urdu})`)
+  );
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // Prevent background scrolling and enable Escape key to close
@@ -99,14 +101,24 @@ export const DashboardView: React.FC = () => {
       const next = [...prev];
       while (next.length < count) {
         const i = next.length;
-        next.push(PUNJAB_DISTRICTS[i] || `Sheet ${i + 1}`);
+        const dist = JIM_PUNJAB_DISTRICTS_ZONES[i];
+        next.push(dist ? `${dist.en} (${dist.urdu})` : `Sheet ${i + 1}`);
       }
       return next;
     });
   };
 
+  const handleLoadOfficial55 = () => {
+    setProjectSheetCount(55);
+    setProjectName('JIM Punjab Official Districts & Zones 2026 (فہرست اضلاع و زونز)');
+    setSheetNames(JIM_PUNJAB_DISTRICTS_ZONES.map(d => `${d.en} (${d.urdu})`));
+  };
+
   const handleResetToDistricts = () => {
-    const next = Array.from({ length: projectSheetCount }).map((_, i) => PUNJAB_DISTRICTS[i] || `Sheet ${i + 1}`);
+    const next = Array.from({ length: projectSheetCount }).map((_, i) => {
+      const dist = JIM_PUNJAB_DISTRICTS_ZONES[i];
+      return dist ? `${dist.en} (${dist.urdu})` : `Sheet ${i + 1}`;
+    });
     setSheetNames(next);
   };
 
@@ -127,7 +139,7 @@ export const DashboardView: React.FC = () => {
         projectSheetCount,
         validNames,
         'template',
-        projectName.trim() || 'JIM Punjab Membership Campaign'
+        projectName.trim() || 'JIM Punjab Official Districts & Zones 2026'
       );
       setIsCreateProjectModalOpen(false);
       setDbSuccessToast(`Created ${createdTabs.length} sheets for "${projectName}" and saved directly to Neon DB!`);
@@ -141,6 +153,34 @@ export const DashboardView: React.FC = () => {
       setIsCreatingProject(false);
     }
   };
+
+  // Filtered sheets for the active project
+  const filteredSheets = useMemo(() => {
+    return sheetTabs.filter((sheet) => {
+      // Category filter
+      if (selectedCategoryFilter === 'central') {
+        const isCentral = sheet.name.includes('Sarparast') || sheet.name.includes('Central Body') || sheet.name.includes('Province Punjab') || sheet.nameUrdu?.includes('مرکزی') || sheet.nameUrdu?.includes('صوبہ') || sheet.nameUrdu?.includes('سرپرست');
+        if (!isCentral) return false;
+      } else if (selectedCategoryFilter === 'wings') {
+        const isWing = sheet.name.includes('Committee') || sheet.name.includes('Jamiat') || sheet.name.includes('Tulba') || sheet.name.includes('Khulafa') || sheet.nameUrdu?.includes('کمیٹی') || sheet.nameUrdu?.includes('طلبہ') || sheet.nameUrdu?.includes('خلفائے') || sheet.nameUrdu?.includes('علماء');
+        if (!isWing) return false;
+      } else if (selectedCategoryFilter === 'districts') {
+        const isSpecial = sheet.name.includes('Sarparast') || sheet.name.includes('Central Body') || sheet.name.includes('Province Punjab') || sheet.name.includes('Committee') || sheet.name.includes('Jamiat') || sheet.name.includes('Tulba') || sheet.name.includes('Khulafa');
+        if (isSpecial) return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = sheet.name?.toLowerCase().includes(q);
+        const matchUrdu = sheet.nameUrdu?.toLowerCase().includes(q);
+        const matchCity = sheet.cityName?.toLowerCase().includes(q);
+        return matchName || matchUrdu || matchCity;
+      }
+
+      return true;
+    });
+  }, [sheetTabs, searchQuery, selectedCategoryFilter]);
 
   // Effective target to collect: dynamically sum all member commitments from the sheets
   const effectiveTarget = totalPledgedTarget > 0 ? totalPledgedTarget : targetToCollect;
@@ -210,7 +250,7 @@ export const DashboardView: React.FC = () => {
             </h1>
 
             <p className="text-xs sm:text-sm text-emerald-200/90 max-w-2xl font-medium leading-relaxed">
-              Institutional Financial Control Center • Membership Fund Management & Punjab District Spreadsheets • Campaign Year 2026.
+              Institutional Financial Control Center • Official Punjab Districts & Zones Membership Accounts • 55 Working Spreadsheets • Campaign Year 2026.
             </p>
           </div>
         </div>
@@ -335,48 +375,48 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Membership collections</span>
-            <span className="font-bold text-emerald-700">Live Sheet Calculation</span>
+            <span className="font-bold text-emerald-700">Live Across 55 Official Sheets</span>
           </div>
         </div>
 
       </section>
 
       {/* ====================================================================
-          3. JIM PUNJAB SHEETS PROJECT
-          Clean project manager: Create 5-10 sheets with standard Shariah format
+          3. JIM PUNJAB OFFICIAL DISTRICTS & ZONES PROJECT
+          Official 55 working sheets transcribed from institutional registry
           ==================================================================== */}
       <section className="bg-white rounded-3xl border border-amber-300/70 p-5 sm:p-7 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-slate-100 gap-4">
           <div>
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
               <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-wide">
-                JIM Punjab Sheets Project • ممبر شپ شیٹس پروجیکٹ
+                JIM Punjab Official Districts & Zones Project • فہرست اضلاع و زونز
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Official 26-column accounting spreadsheets backed by Neon PostgreSQL cloud database
+              Official institutional registry of 55 Punjab districts, zones, and administrative bodies backed by Neon PostgreSQL
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setIsCreateProjectModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all hover:scale-105 active:scale-95 border border-amber-400/80 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-all hover:scale-105 active:scale-95 border border-amber-400/80 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-amber-300" />
-              <span>+ Create Sheet Project</span>
+              <span>+ Create / Configure Project</span>
             </button>
 
             <button
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  window.location.href = `/dashboard/sheets/${activeSheetTabId || (sheetTabs[0]?.id ?? 'sheet1')}`;
+                  window.location.href = `/dashboard/sheets/${activeSheetTabId || (sheetTabs[0]?.id ?? 'sheet-00-sarparast-e-aala')}`;
                 } else {
                   setActiveTab('sheets');
                 }
               }}
-              className="px-4 py-2 rounded-xl bg-[#fdfaf3] hover:bg-amber-50 text-emerald-950 font-bold text-xs flex items-center gap-1.5 border border-amber-300/80 cursor-pointer transition-colors shadow-2xs"
+              className="px-4 py-2.5 rounded-xl bg-[#fdfaf3] hover:bg-amber-50 text-emerald-950 font-bold text-xs flex items-center gap-1.5 border border-amber-300/80 cursor-pointer transition-colors shadow-2xs"
             >
               <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
               <span>Open Sheets Workspace</span>
@@ -384,80 +424,148 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
+        {/* Filter & Search Bar */}
+        <div className="pt-4 pb-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+          
+          {/* Category Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+            <button
+              onClick={() => setSelectedCategoryFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                selectedCategoryFilter === 'all'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              All Sheets ({sheetTabs.length})
+            </button>
+
+            <button
+              onClick={() => setSelectedCategoryFilter('districts')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                selectedCategoryFilter === 'districts'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Punjab Districts & Zones (47)
+            </button>
+
+            <button
+              onClick={() => setSelectedCategoryFilter('central')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                selectedCategoryFilter === 'central'
+                  ? 'bg-amber-700 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Central Bodies (3)
+            </button>
+
+            <button
+              onClick={() => setSelectedCategoryFilter('wings')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                selectedCategoryFilter === 'wings'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              Committees & Wings (4)
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search district, city or Urdu name..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-[#fdfaf3] border border-amber-300/80 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-700 font-medium"
+            />
+          </div>
+
+        </div>
+
         {/* Existing Sheets Overview in Project */}
-        <div className="pt-5">
-          {sheetTabs.length === 0 ? (
-            <div className="text-center py-12 px-4 rounded-2xl bg-[#fdfaf3] border border-dashed border-amber-300">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-3">
-                <FileSpreadsheet className="w-6 h-6" />
+        <div className="pt-3">
+          {filteredSheets.length === 0 ? (
+            <div className="text-center py-10 px-4 rounded-2xl bg-[#fdfaf3] border border-dashed border-amber-300">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-2">
+                <FileSpreadsheet className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-800">No Sheets Created Yet</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                Initialize your project by creating 5 to 10 sheets with the official 26-column accounting layout.
+              <h3 className="text-sm font-bold text-slate-800">No Sheets Found Matching Filter</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-3">
+                Try searching for another district name (e.g. Lahore, Faisalabad, Multan, Rawalpindi) or reset the filter.
               </p>
               <button
-                onClick={() => setIsCreateProjectModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-2 shadow-md cursor-pointer border border-amber-400"
+                onClick={() => { setSearchQuery(''); setSelectedCategoryFilter('all'); }}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-800 text-white text-xs font-bold"
               >
-                <Plus className="w-4 h-4 text-amber-300" />
-                <span>Create Sheet Project (5-10 Sheets)</span>
+                Clear Search & Show All
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span className="font-semibold text-slate-700">
-                  {sheetTabs.length} Active Working {sheetTabs.length === 1 ? 'Sheet' : 'Sheets'} in Project
+                  Showing {filteredSheets.length} of {sheetTabs.length} Working Sheets
                 </span>
                 <span className="text-[11px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                  ✓ Standard 26-Column Shariah Accounting Format
+                  ✓ Standard 26-Column Shariah Accounting Format (A-Z)
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {sheetTabs.map((sheet, index) => {
-                  const sheetNumber = index + 1;
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[580px] overflow-y-auto p-1">
+                {filteredSheets.map((sheet, index) => {
                   const isCurrentlyActive = activeSheetTabId === sheet.id;
+                  const itemIndex = sheet.sortOrder !== undefined ? sheet.sortOrder : index;
 
                   return (
                     <div 
                       key={sheet.id}
-                      className="p-4 rounded-2xl bg-[#fdfaf3] border border-amber-200/90 hover:border-amber-400 transition-all flex flex-col justify-between shadow-2xs hover:shadow-sm"
+                      className="p-3.5 rounded-2xl bg-[#fdfaf3] border border-amber-200/90 hover:border-amber-400 transition-all flex flex-col justify-between shadow-2xs hover:shadow-sm"
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                            {sheetNumber}
-                          </div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-900 font-black font-mono text-[11px] flex items-center justify-center">
+                            {itemIndex}
+                          </span>
                           {isCurrentlyActive && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <span className="px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
                               Active
                             </span>
                           )}
                         </div>
 
-                        <h3 className="font-black text-slate-900 text-sm truncate">
-                          {sheet.name || `Sheet ${sheetNumber}`}
+                        <div className="font-arabic font-bold text-amber-900 text-sm dir-rtl truncate">
+                          {sheet.nameUrdu || sheet.name}
+                        </div>
+                        <h3 className="font-bold text-slate-900 text-xs truncate mt-0.5">
+                          {sheet.name}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
                           {sheet.cityName && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                              📍 {sheet.cityName}
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-0.5">
+                              <MapPin className="w-2.5 h-2.5" />
+                              <span>{sheet.cityName}</span>
                             </span>
                           )}
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
                             26 Cols (A-Z)
                           </span>
                         </div>
                       </div>
 
-                      <div className="mt-3.5 pt-2.5 border-t border-amber-200/60 flex items-center justify-between gap-2">
+                      <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between gap-1.5">
                         <button
                           onClick={() => handleOpenSheet(sheet.id)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-emerald-950 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                          className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-emerald-950 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
                         >
                           <span>Open Sheet</span>
-                          <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                          <ExternalLink className="w-3 h-3 text-emerald-700" />
                         </button>
 
                         <button
@@ -466,9 +574,9 @@ export const DashboardView: React.FC = () => {
                           title="Copy direct shareable link"
                         >
                           {copiedSheetId === sheet.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <Check className="w-3 h-3 text-emerald-600" />
                           ) : (
-                            <Share2 className="w-3.5 h-3.5" />
+                            <Share2 className="w-3 h-3" />
                           )}
                         </button>
                       </div>
@@ -532,16 +640,20 @@ export const DashboardView: React.FC = () => {
               <div className="p-4 sm:p-5 rounded-2xl bg-white border border-amber-300/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm sm:text-base font-black text-slate-900">
-                    Institutional Working Sheets Project Setup
+                    Official Punjab Districts & Zones Setup
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Select how many sheets you need (e.g. 5–10) and customize their names. All sheets will automatically follow the official 26-column Shariah accounting format and sync directly with Neon PostgreSQL DB.
+                    Select sheet count or load all 55 official JIM Punjab districts and zones. Every sheet is formatted in the official 26-column Shariah accounting format and backed by Neon DB.
                   </p>
                 </div>
-                <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Neon DB Connected</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleLoadOfficial55}
+                  className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs shadow-xs hover:from-amber-300 hover:to-amber-400 cursor-pointer border border-amber-300"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-950" />
+                  <span>Load All 55 Districts (فہرست اضلاع)</span>
+                </button>
               </div>
 
               {/* Form Card */}
@@ -557,7 +669,7 @@ export const DashboardView: React.FC = () => {
                     required
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="JIM Punjab Membership Campaign 2026"
+                    placeholder="JIM Punjab Official Districts & Zones 2026"
                     className="w-full px-4 py-2.5 text-sm sm:text-base bg-[#fdfaf3] border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-700 font-bold text-slate-900"
                   />
                 </div>
@@ -566,7 +678,7 @@ export const DashboardView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      2. How Many Sheets? (Select 5–10)
+                      2. How Many Sheets? (Select Presets)
                     </label>
                     <span className="text-xs text-emerald-800 font-bold">
                       Currently Selected: {projectSheetCount} Sheets
@@ -574,7 +686,7 @@ export const DashboardView: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
-                    {[3, 5, 8, 10, 12, 15].map((count) => {
+                    {[5, 10, 15, 25, 35, 55].map((count) => {
                       const isSelected = projectSheetCount === count;
                       return (
                         <button
@@ -588,20 +700,22 @@ export const DashboardView: React.FC = () => {
                           }`}
                         >
                           <span className="text-lg font-mono font-black">{count}</span>
-                          <span className="text-[11px] font-sans font-bold">Sheets</span>
+                          <span className="text-[11px] font-sans font-bold">
+                            {count === 55 ? 'All 55 (مکمل)' : 'Sheets'}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
 
                   <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100">
-                    <span className="text-xs font-bold text-slate-600">Or custom count (1–30):</span>
+                    <span className="text-xs font-bold text-slate-600">Or custom count (1–60):</span>
                     <input
                       type="number"
                       min={1}
-                      max={30}
+                      max={60}
                       value={projectSheetCount}
-                      onChange={(e) => handleUpdateSheetCount(Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 1)))}
+                      onChange={(e) => handleUpdateSheetCount(Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 1)))}
                       className="w-20 px-3 py-1.5 text-xs text-center font-bold bg-[#fdfaf3] border border-amber-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-700"
                     />
                     <span className="text-[11px] text-slate-400">sheets total</span>
@@ -616,7 +730,7 @@ export const DashboardView: React.FC = () => {
                         3. Name Each Sheet ({projectSheetCount} Working Sheets)
                       </label>
                       <span className="text-[11px] text-slate-500">
-                        Customize names for each division, district, or unit
+                        Official names extracted directly from the institutional registry
                       </span>
                     </div>
 
@@ -625,7 +739,7 @@ export const DashboardView: React.FC = () => {
                       onClick={handleResetToDistricts}
                       className="text-xs font-bold text-emerald-800 hover:text-emerald-900 underline cursor-pointer self-start sm:self-auto"
                     >
-                      Reset to Punjab Districts (Lahore, Faisalabad...)
+                      Reset to Official Registry Names
                     </button>
                   </div>
 
@@ -633,13 +747,13 @@ export const DashboardView: React.FC = () => {
                     {Array.from({ length: projectSheetCount }).map((_, idx) => (
                       <div key={idx} className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2">
                         <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-900 font-bold font-mono text-xs flex items-center justify-center shrink-0">
-                          {idx + 1}
+                          {idx}
                         </span>
                         <input
                           type="text"
                           value={sheetNames[idx] || ''}
                           onChange={(e) => handleSheetNameChange(idx, e.target.value)}
-                          placeholder={`Sheet ${idx + 1}`}
+                          placeholder={`Sheet ${idx}`}
                           className="flex-1 min-w-0 px-2.5 py-1 text-xs font-bold text-slate-800 bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-emerald-700 rounded"
                         />
                       </div>

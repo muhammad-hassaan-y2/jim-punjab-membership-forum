@@ -116,6 +116,7 @@ export interface SheetTab {
   startDate?: string;
   endDate?: string;
   openingBalance?: number;
+  sortOrder?: number;
 }
 
 export interface OrganizationConfig {
