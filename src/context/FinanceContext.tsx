@@ -584,7 +584,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addBlankRow = async (count: number = 1) => {
     setDbStatus('syncing');
     const newRows: Transaction[] = [];
-    const nums = transactions.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+    const activeTab = sheetTabs.find(t => t.id === activeSheetTabId);
+    const defaultBranch = activeTab?.name || 'Main Branch';
+    const cleanCityFromSheet = activeTab?.cityName || (activeTab?.name ? activeTab.name.replace(/\s*\(.*?\)/, '').trim() : 'Lahore');
+    const defaultZila = cleanCityFromSheet || 'Lahore';
+
+    // Sheet-specific receipt numbering starting from 1
+    const sheetTxs = transactions.filter(t => t.sheetId === activeTab?.id || (activeTab?.cityName && t.zila === activeTab.cityName));
+    const nums = sheetTxs.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
     const startNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -592,14 +599,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const dd = String(now.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    const activeTab = sheetTabs.find(t => t.id === activeSheetTabId);
-    const defaultBranch = activeTab?.name || 'Main Branch';
-    const defaultZila = activeTab?.cityName || 'Lahore';
-
     for (let i = 0; i < count; i++) {
       const receiptNo = String(startNum + i);
       newRows.push({
         id: `tx-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
+        sheetId: activeTab?.id,
         receiptNo: receiptNo,
         date: todayStr,
         donorName: '',

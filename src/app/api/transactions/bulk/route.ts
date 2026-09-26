@@ -17,13 +17,14 @@ export async function POST(req: Request) {
           const id = tx.id || `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
           return sql`
             INSERT INTO transactions (
-              id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, address, address_urdu,
+              id, sheet_id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, address, address_urdu,
               monthly_amount, quarterly_amount, annually_amount, months_data,
               amount, amount_in_words_en, amount_in_words_ur, type, category_id,
               payment_method, bank_name, check_number, transaction_id, description, description_urdu,
               recorded_by, verified_by, created_at
             ) VALUES (
               ${id}, 
+              ${tx.sheetId || null},
               ${tx.receiptNo || ''}, 
               ${tx.date || new Date().toISOString().split('T')[0]}, 
               ${tx.donorName || ''}, 
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
               ${tx.createdAt ? new Date(tx.createdAt) : new Date()}
             )
             ON CONFLICT (id) DO UPDATE SET
+              sheet_id = COALESCE(EXCLUDED.sheet_id, transactions.sheet_id),
               receipt_no = EXCLUDED.receipt_no,
               date = EXCLUDED.date,
               donor_name = EXCLUDED.donor_name,

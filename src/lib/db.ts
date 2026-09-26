@@ -43,6 +43,7 @@ export async function initDatabase() {
     // Ensure columns exist on transactions table
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS branch_name VARCHAR(255)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS zila VARCHAR(255)`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sheet_id VARCHAR(100)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS monthly_amount NUMERIC(15, 2) DEFAULT 0`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS quarterly_amount NUMERIC(15, 2) DEFAULT 0`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS annually_amount NUMERIC(15, 2) DEFAULT 0`;

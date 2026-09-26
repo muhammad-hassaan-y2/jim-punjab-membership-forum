@@ -871,25 +871,11 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        list="modal-pakistan-cities"
                         value={currentEntry.city}
                         onChange={(e) => updateCurrentEntry('city', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="e.g. Karachi, Lahore..."
                       />
-                      <datalist id="modal-pakistan-cities">
-                        <option value="Karachi" />
-                        <option value="Lahore" />
-                        <option value="Rawalpindi" />
-                        <option value="Islamabad" />
-                        <option value="Faisalabad" />
-                        <option value="Multan" />
-                        <option value="Hyderabad" />
-                        <option value="Kandiaro" />
-                        <option value="Sukkur" />
-                        <option value="Peshawar" />
-                        <option value="Quetta" />
-                      </datalist>
                     </div>
 
                     {/* Preferred Period with Tick (✓) & Cross (✗) Only */}
@@ -1016,7 +1002,6 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
                       </label>
                       <input
                         type="text"
-                        list="modal-pakistan-cities"
                         value={currentEntry.zila}
                         onChange={(e) => updateCurrentEntry('zila', e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"

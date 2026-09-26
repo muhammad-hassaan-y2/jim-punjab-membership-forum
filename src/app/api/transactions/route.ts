@@ -7,6 +7,7 @@ export async function GET() {
     const rows = await sql`
       SELECT 
         id,
+        sheet_id as "sheetId",
         receipt_no as "receiptNo",
         date,
         donor_name as "donorName",
@@ -52,13 +53,14 @@ export async function POST(req: Request) {
     
     await sql`
       INSERT INTO transactions (
-        id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, address, address_urdu,
+        id, sheet_id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, address, address_urdu,
         monthly_amount, quarterly_amount, annually_amount, months_data,
         amount, amount_in_words_en, amount_in_words_ur, type, category_id,
         payment_method, bank_name, check_number, transaction_id, description, description_urdu,
         recorded_by, verified_by, created_at
       ) VALUES (
         ${id}, 
+        ${tx.sheetId || null},
         ${tx.receiptNo || ''}, 
         ${tx.date || new Date().toISOString().split('T')[0]}, 
         ${tx.donorName || ''}, 

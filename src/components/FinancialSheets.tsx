@@ -429,10 +429,25 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     return transactions.filter(t => {
       // Sheet tab filter
       if (currentSheetTab) {
+        if (t.sheetId) {
+          if (t.sheetId !== currentSheetTab.id) return false;
+        } else {
+          // Fallback matching for legacy database records:
+          const targetCity = (currentSheetTab.cityName || currentSheetTab.name || '')
+            .toLowerCase()
+            .replace(/\s*\(.*?\)/, '')
+            .trim();
+          const txZila = (t.zila || t.city || '').toLowerCase().trim();
+          if (targetCity) {
+            const isMatch = txZila.includes(targetCity) || targetCity.includes(txZila);
+            if (!isMatch) return false;
+          }
+        }
+
         if (currentSheetTab.typeFilter && currentSheetTab.typeFilter !== 'all' && t.type !== currentSheetTab.typeFilter) return false;
       }
 
-      // Slicers: Type, Zila, Branch, Payment Mode, Status
+      // Slicers: Type, Branch, Payment Mode, Status
       if (selectedType !== 'all' && t.type !== selectedType) return false;
       if (selectedZila !== 'all' && (t.zila || t.city || '').toLowerCase() !== selectedZila.toLowerCase()) return false;
       if (selectedBranch !== 'all' && (t.branchName || '').toLowerCase() !== selectedBranch.toLowerCase()) return false;
@@ -1699,19 +1714,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                 <option value="expense">Expense Only</option>
               </select>
 
-              {/* Punjab Zila / District Slicer */}
-              <select
-                value={selectedZila}
-                onChange={(e) => setSelectedZila(e.target.value)}
-                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold max-w-[150px]"
-                title="Filter by Punjab Zila / District"
-              >
-                <option value="all">📍 All Zilas / اضلاع</option>
-                {availableZilas.map((z) => (
-                  <option key={z} value={z}>{z}</option>
-                ))}
-              </select>
-
               {/* Branch Slicer (if available) */}
               {availableBranches.length > 0 && (
                 <select
@@ -2472,7 +2474,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           {editingCell?.rowId === tx.id && editingCell.colKey === 'zila' ? (
                             <input
                               type="text"
-                              list="pakistan-cities"
                               autoFocus
                               value={cellEditValue}
                               onChange={(e) => setCellEditValue(e.target.value)}
@@ -3142,7 +3143,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   <MapPin className="w-4 h-4 text-amber-500 absolute left-3 top-3" />
                   <input
                     type="text"
-                    list="pakistan-cities"
                     value={newSheetCity}
                     onChange={(e) => {
                       setNewSheetCity(e.target.value);
@@ -3539,51 +3539,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           setCurrentPage(1);
         }}
       />
-
-      {/* Autocomplete Datalist for Pakistan & Punjab Cities */}
-      <datalist id="pakistan-cities">
-        <option value="Lahore" />
-        <option value="Faisalabad" />
-        <option value="Rawalpindi" />
-        <option value="Gujranwala" />
-        <option value="Multan" />
-        <option value="Bahawalpur" />
-        <option value="Sargodha" />
-        <option value="Sialkot" />
-        <option value="Sheikhupura" />
-        <option value="Rahim Yar Khan" />
-        <option value="Jhang" />
-        <option value="Dera Ghazi Khan" />
-        <option value="Gujrat" />
-        <option value="Sahiwal" />
-        <option value="Wah Cantt" />
-        <option value="Kasur" />
-        <option value="Okara" />
-        <option value="Mianwali" />
-        <option value="Chiniot" />
-        <option value="Kamoke" />
-        <option value="Hafizabad" />
-        <option value="Sadiqabad" />
-        <option value="Burewala" />
-        <option value="Khanewal" />
-        <option value="Muzaffargarh" />
-        <option value="Mandi Bahauddin" />
-        <option value="Jhelum" />
-        <option value="Khanpur" />
-        <option value="Chakwal" />
-        <option value="Khushab" />
-        <option value="Bahawalnagar" />
-        <option value="Vehari" />
-        <option value="Pakpattan" />
-        <option value="Toba Tek Singh" />
-        <option value="Attock" />
-        <option value="Lodhran" />
-        <option value="Bhakkar" />
-        <option value="Islamabad" />
-        <option value="Karachi" />
-        <option value="Peshawar" />
-        <option value="Quetta" />
-      </datalist>
 
     </div>
   );

@@ -58,6 +58,7 @@ export const MONTH_LABELS: Record<MonthKey, { en: string; ur: string }> = {
 
 export interface Transaction {
   id: string;
+  sheetId?: string;
   receiptNo: string;
   date: string; // ISO format: YYYY-MM-DD
   donorName: string; // اسم گرامی / نام دہندہ
