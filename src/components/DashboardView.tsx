@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { 
   Coins, 
-  Layers, 
   FileSpreadsheet, 
   Plus, 
   ExternalLink, 
@@ -32,8 +31,6 @@ export const DashboardView: React.FC = () => {
     setActiveTab,
     transactions,
     totalIncome,
-    totalExpense,
-    netBalance,
     targetToCollect,
     setTargetToCollect,
     totalPledgedTarget,
@@ -57,6 +54,17 @@ export const DashboardView: React.FC = () => {
     'Lahore', 'Faisalabad', 'Rawalpindi', 'Multan', 'Gujranwala'
   ]);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (isCreateProjectModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isCreateProjectModalOpen]);
 
   // Handle direct navigation to dynamic sheet route
   const handleOpenSheet = (tabId: string) => {
@@ -325,68 +333,7 @@ export const DashboardView: React.FC = () => {
       </section>
 
       {/* ====================================================================
-          3. MEMBERSHIP FUND SPECIFICATION SECTION
-          Only Membership Funds allowed (Zakat, Fitrat, etc. removed)
-          ==================================================================== */}
-      <section className="bg-white rounded-3xl border border-amber-300/70 p-5 sm:p-7 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-emerald-700" />
-              <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-wide">
-                Dedicated Membership Fund • ممبر شپ فنڈ
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Jamaat Islahul Muslimeen Punjab membership subscription contributions and records
-            </p>
-          </div>
-          <span className="text-xs font-bold text-emerald-800 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-200 self-start sm:self-auto">
-            Primary Fund: Membership Only
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5">
-          <div className="p-4 rounded-2xl bg-[#fdfaf3] border border-amber-200/80 shadow-2xs">
-            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">
-              Membership Collections (Inflows)
-            </span>
-            <span className="text-xl sm:text-2xl font-black font-mono text-emerald-800 block mt-1">
-              {orgConfig.currencySymbol} {totalIncome.toLocaleString()}
-            </span>
-            <span className="text-xs text-emerald-700 font-medium mt-1 block">
-              Direct member contributions
-            </span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-[#fdfaf3] border border-amber-200/80 shadow-2xs">
-            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider block">
-              Membership Disbursements (Sent)
-            </span>
-            <span className="text-xl sm:text-2xl font-black font-mono text-rose-700 block mt-1">
-              {orgConfig.currencySymbol} {totalExpense.toLocaleString()}
-            </span>
-            <span className="text-xs text-rose-700 font-medium mt-1 block">
-              Organizational operational expenditures
-            </span>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-emerald-950 text-white border border-amber-400/80 shadow-2xs">
-            <span className="text-[11px] text-emerald-300 font-bold uppercase tracking-wider block">
-              Membership Net Reserve
-            </span>
-            <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 block mt-1">
-              {orgConfig.currencySymbol} {netBalance.toLocaleString()}
-            </span>
-            <span className="text-xs text-emerald-200 font-medium mt-1 block">
-              Available liquid balance
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ====================================================================
-          4. JIM PUNJAB SHEETS PROJECT
+          3. JIM PUNJAB SHEETS PROJECT
           Clean project manager: Create 5-10 sheets with standard Shariah format
           ==================================================================== */}
       <section className="bg-white rounded-3xl border border-amber-300/70 p-5 sm:p-7 shadow-xs">
@@ -527,14 +474,22 @@ export const DashboardView: React.FC = () => {
 
       {/* ====================================================================
           CREATE SHEET PROJECT MODAL DIALOG
-          Allows selecting 5-10 sheets, custom naming, 26-column standard format
+          - Fixed to top without excessive upward gap
+          - Body scroll locked when open
+          - Click backdrop to close
           ==================================================================== */}
       {isCreateProjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-full max-w-xl rounded-3xl bg-white border-2 border-amber-400 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div 
+          className="fixed inset-0 z-[100] overflow-y-auto flex items-start justify-center p-3 sm:p-5 pt-6 sm:pt-10 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsCreateProjectModalOpen(false)}
+        >
+          <div 
+            className="relative w-full max-w-xl rounded-3xl bg-white border-2 border-amber-400 shadow-2xl overflow-hidden flex flex-col my-auto max-h-[calc(100vh-3rem)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-950 text-white p-5 sm:p-6 border-b border-amber-400/40 relative">
+            <div className="bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-950 text-white p-5 sm:p-6 border-b border-amber-400/40 relative shrink-0">
               <button
                 onClick={() => setIsCreateProjectModalOpen(false)}
                 className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
