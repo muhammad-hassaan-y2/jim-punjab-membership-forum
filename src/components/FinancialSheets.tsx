@@ -37,10 +37,8 @@ import {
   Layers,
   Users,
   Target,
-  TrendingUp,
-  AlertCircle,
-  DollarSign,
-  CheckCircle2
+  CheckCircle2,
+  MoreHorizontal
 } from 'lucide-react';
 import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey } from '../types/finance';
 
@@ -208,6 +206,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
   // Shareable Link state & handler
   const [isLinkCopied, setIsLinkCopied] = useState(false);
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
 
   const handleShareSheet = async () => {
     // If in raw mode, sync grid to Neon DB so recipient on another device can view it
@@ -1297,95 +1296,25 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   return (
     <div className="space-y-4 pb-12">
 
-      {/* ====================================================================
-          PROJECT & YEAR CONTROL BAR (JIM PUNJAB) WITH BATCH & DB SYNC
-          ==================================================================== */}
-      <div className="bg-gradient-to-r from-emerald-950 via-[#022c22] to-slate-900 text-white rounded-2xl p-4 sm:p-5 border-2 border-amber-400/80 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-arabic text-amber-300 font-bold text-sm sm:text-base">جماعت اصلاح المسلمین پنجاب</span>
-            <span className="text-amber-400/70 text-xs">✦</span>
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-300">JIM Punjab Campaigns</span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Briefcase className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm sm:text-base font-black text-white">
-              Project: {currentProject?.name || 'JIM Punjab Campaign'}
-            </h2>
-            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-400 text-slate-950 font-mono">
-              Year {currentProject?.year || '2026'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Project Switcher Dropdown */}
-          <div className="flex items-center gap-1.5 bg-emerald-900/80 px-2.5 py-1.5 rounded-xl border border-emerald-700/80 text-xs">
-            <span className="text-emerald-300 font-bold hidden sm:inline">Campaign:</span>
-            <select
-              value={activeProjectId}
-              onChange={(e) => setActiveProjectId(e.target.value)}
-              className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                  {p.name} ({p.year})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Batch Sheets Generator Button (Select How Many Sheets & Save to DB) */}
-          <button
-            onClick={() => setIsBatchModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer ring-2 ring-amber-400/30"
-            title="Select how many sheets you need and save them directly to Neon PostgreSQL database"
-          >
-            <Layers className="w-3.5 h-3.5 text-slate-950" />
-            <span>⚡ Multi-Sheet Creator</span>
-          </button>
-
-          {/* Save All Sheets to Database Button */}
-          <button
-            onClick={handleManualSaveAllToDb}
-            disabled={isSavingToDb}
-            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-blue-400/80 cursor-pointer disabled:opacity-50"
-            title="Save all working sheets directly to Neon PostgreSQL Cloud Database"
-          >
-            <Database className="w-3.5 h-3.5 text-blue-200" />
-            <span>{isSavingToDb ? 'Saving...' : '💾 Save All to DB'}</span>
-          </button>
-
-          {/* Create New Project Button */}
-          <button
-            onClick={() => setIsNewProjectModalOpen(true)}
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-slate-700 cursor-pointer"
-            title="Create New Project and specify Year (e.g. 2026)"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Project</span>
-          </button>
-
-          {/* Add Sheet with City Button */}
-          <button
-            onClick={() => setIsNewSheetModalOpen(true)}
-            className="px-3 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 border border-emerald-600/80 cursor-pointer"
-            title="Add a single new city working sheet"
-          >
-            <MapPin className="w-3.5 h-3.5 text-amber-300" />
-            <span>+ City Sheet</span>
-          </button>
-        </div>
-      </div>
-      
       {/* SPREADSHEET CARD */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
         
-        {/* Title Bar: Dashboard Button & Sheet Info & Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between p-3.5 border-b border-slate-100 dark:border-slate-800 gap-3">
+        {/* Hidden file input for import */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+        />
+
+        {/* ====================================================================
+            CLEAN HEADER: Dashboard Return, Sheet / City Name & Streamlined Actions
+            ==================================================================== */}
+        <div className="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 gap-3 bg-slate-50/50 dark:bg-slate-900/50">
           
+          {/* Left: Back button + Sheet Title & Inline Rename & Delete */}
           <div className="flex items-center gap-3">
-            {/* Direct Dashboard Button - Fully Available only when NOT in standalone share view */}
             {!isStandaloneShareView ? (
               <>
                 <button
@@ -1396,245 +1325,108 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                       setActiveTab('dashboard');
                     }
                   }}
-                  className="flex items-center gap-2 px-4 py-2 sm:px-4.5 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 font-black text-xs sm:text-sm transition-all shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow active:scale-95 cursor-pointer"
                   title="Return to Main Dashboard"
                 >
-                  <ArrowLeft className="w-4 h-4 stroke-[3]" />
+                  <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
                   <span>Dashboard</span>
                 </button>
-                <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
               </>
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Shared Sheet View</span>
+                <span>Shared Sheet</span>
               </div>
             )}
 
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-                <FileSpreadsheet className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <FileSpreadsheet className="w-4 h-4" />
               </div>
-              <div>
+              
+              {isEditingSheetName ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={sheetNameInput}
+                    onChange={(e) => setSheetNameInput(e.target.value)}
+                    onKeyDown={handleRenameKeyDown}
+                    onBlur={handleSaveRename}
+                    className="px-2.5 py-1 text-sm font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-emerald-500 rounded-lg outline-none shadow-xs w-44 sm:w-56"
+                    placeholder="Sheet / City name..."
+                  />
+                  <button
+                    onMouseDown={(e) => { e.preventDefault(); handleSaveRename(); }}
+                    className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                    title="Save sheet name"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onMouseDown={(e) => { e.preventDefault(); setIsEditingSheetName(false); }}
+                    className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-colors"
+                    title="Cancel"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
                 <div className="flex items-center gap-2">
-                  {isEditingSheetName ? (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        autoFocus
-                        value={sheetNameInput}
-                        onChange={(e) => setSheetNameInput(e.target.value)}
-                        onKeyDown={handleRenameKeyDown}
-                        onBlur={handleSaveRename}
-                        className="px-2.5 py-1 text-sm font-black text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-blue-500 rounded-lg outline-none shadow-xs w-40 sm:w-56"
-                        placeholder="Enter sheet name..."
-                      />
-                      <button
-                        onMouseDown={(e) => { e.preventDefault(); handleSaveRename(); }}
-                        className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
-                        title="Save sheet name"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onMouseDown={(e) => { e.preventDefault(); setIsEditingSheetName(false); }}
-                        className="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 transition-colors"
-                        title="Cancel"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-1.5 group">
-                        <h2 
-                          onClick={handleStartRename}
-                          className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 py-0.5 px-1 -mx-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-                          title="Click to rename Sheet & City / Zila Name"
-                        >
-                          <span>{currentSheetTitle}</span>
-                          <Pencil className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 text-slate-400 group-hover:text-blue-600 transition-opacity" />
-                        </h2>
-                      </div>
+                  <h2 
+                    onClick={handleStartRename}
+                    className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5 py-0.5 px-1.5 -mx-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 group"
+                    title="Click to rename Sheet & City"
+                  >
+                    <span>{currentSheetTitle}</span>
+                    <Pencil className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 text-slate-400 group-hover:text-emerald-600 transition-opacity" />
+                  </h2>
 
-                      {/* City / Zila badge */}
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-amber-600" />
-                        <span>ضلع / City: {currentSheetTab?.cityName || currentSheetTitle}</span>
-                      </span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete sheet "${currentSheetTitle}"?`)) {
+                        deleteSheetTab(activeSheetTabId);
+                      }
+                    }}
+                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-md transition-colors"
+                    title="Delete this sheet"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
 
-                      {/* Delete Sheet Button */}
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Are you sure you want to delete sheet "${currentSheetTitle}"?`)) {
-                            deleteSheetTab(activeSheetTabId);
-                          }
-                        }}
-                        className="p-1 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950 hover:text-rose-700 transition-colors cursor-pointer"
-                        title="Delete this sheet"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300">
-                    {isRawMode ? 'Raw Excel / Google Grid' : 'Institutional Ledger'}
+                  <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full hidden sm:inline-block">
+                    {isRawMode ? `${rawRowCount} rows` : `${filteredTransactions.length} records`}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  {isRawMode ? `${rawRowCount} rows × 26 columns (A-Z)` : `${filteredTransactions.length} records recorded`}
-                </p>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Mode Switcher Toggle: [Excel/Google Grid (A-Z)] vs [9-Column Template] */}
-          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-            <button
-              onClick={() => setViewModeOverride('raw')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                isRawMode
-                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-              title="Switch to raw Excel / Google Sheet freeform grid with all columns (A-Z)"
-            >
-              <Grid3X3 className="w-3.5 h-3.5" />
-              <span>Excel Grid (A-Z)</span>
-            </button>
-            <button
-              onClick={() => setViewModeOverride('template')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                !isRawMode
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-              title="Switch to 9-Column pre-configured Institutional Ledger Template"
-            >
-              <TableProperties className="w-3.5 h-3.5" />
-              <span>9-Column Template</span>
-            </button>
-          </div>
-
-          {/* Action Buttons: Add, Share, Download Excel, Print PDF, Import, Clear */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Right: Streamlined Action Buttons */}
+          <div className="flex items-center gap-2">
             
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-            />
-
-            {/* Shareable Link Button */}
+            {/* + Add Row */}
             <button
-              onClick={handleShareSheet}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
-                isLinkCopied
-                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20'
-                  : 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-              }`}
-              title="Copy shareable link to this sheet"
+              onClick={() => isRawMode ? handleAddRawRows(50) : addBlankRow(1)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer"
+              title="Add new row"
             >
-              {isLinkCopied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Link Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span>Share Sheet</span>
-                </>
-              )}
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Add Row</span>
             </button>
 
-            {/* Add Row Button & Quick Presets */}
-            {isRawMode ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleAddRawRows(100)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 bg-emerald-600 hover:bg-emerald-700"
-                  title="Add 100 more rows to raw sheet"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Add 100 Rows</span>
-                </button>
-                <button
-                  onClick={() => handleAddRawRows(50)}
-                  className="hidden sm:inline-flex px-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-bold"
-                  title="Add 50 rows"
-                >
-                  +50
-                </button>
-                <button
-                  onClick={() => handleAddRawRows(200)}
-                  className="hidden md:inline-flex px-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-bold"
-                  title="Add 200 rows"
-                >
-                  +200
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => addBlankRow(1)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 bg-emerald-600 hover:bg-emerald-700"
-                  title="Add 1 row to ledger"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Add Row</span>
-                </button>
-                <button
-                  onClick={() => addBlankRow(10)}
-                  className="hidden sm:inline-flex px-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-bold"
-                  title="Add 10 rows"
-                >
-                  +10
-                </button>
-                <button
-                  onClick={() => addBlankRow(50)}
-                  className="hidden sm:inline-flex px-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-bold"
-                  title="Add 50 rows"
-                >
-                  +50
-                </button>
-                <button
-                  onClick={() => addBlankRow(100)}
-                  className="hidden md:inline-flex px-2.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-xs font-bold"
-                  title="Add 100 rows"
-                >
-                  +100
-                </button>
-              </div>
-            )}
-
-            {/* AI Scan Document & Receipt Button (Gemini Multimodal AI) */}
+            {/* AI Scan Document */}
             <button
               onClick={() => setIsGeminiScannerOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black text-emerald-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border border-amber-200 cursor-pointer"
-              title="Upload document or picture of receipt/voucher, let Gemini check data, confirm & enter into sheet"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 shadow-xs hover:shadow active:scale-95 transition-all border border-amber-300/80 cursor-pointer"
+              title="Scan document or receipt photo with Gemini AI"
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-950 animate-pulse" />
-              <span>AI Scan Document</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-900" />
+              <span className="hidden sm:inline">AI Scan</span>
             </button>
 
-            {/* Rewrite Receipt Numbers Ascending (1, 2, 3...) */}
-            {!isRawMode && (
-              <button
-                onClick={() => {
-                  rewriteReceiptNumbersAscending();
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-xs font-bold shadow-2xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                title="Rewrite all receipt numbers in strict sequential ascending order (1, 2, 3...)"
-              >
-                <Hash className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span>Renumber (1, 2, 3...)</span>
-              </button>
-            )}
-
-            {/* Download Sheet (Excel) */}
+            {/* Download Excel */}
             <button
               onClick={() => {
                 if (isRawMode) {
@@ -1643,14 +1435,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   exportTransactionsToExcel(filteredTransactions, categories, orgConfig, currentSheetTab?.name || `Sheet_${currentSheetNumber}`);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-semibold shadow-2xs hover:border-emerald-500 hover:text-emerald-600 transition-colors"
-              title="Download Sheet as formatted Excel (.xlsx)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              title="Download as Excel (.xlsx)"
             >
-              <Download className="w-4 h-4 text-emerald-500" />
-              <span>Download Excel</span>
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden md:inline">Excel</span>
             </button>
 
-            {/* Print in PDF */}
+            {/* Print PDF */}
             <button
               onClick={() => {
                 if (isRawMode) {
@@ -1659,84 +1451,145 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   printSheetAsPDF(currentSheetTab?.name || `Sheet ${currentSheetNumber}`, filteredTransactions, categories, orgConfig);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-semibold shadow-2xs hover:border-blue-500 hover:text-blue-600 transition-colors"
-              title="Print Sheet in PDF (Landscape format with official headers)"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-blue-500 hover:text-blue-600 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              title="Print PDF"
             >
-              <Printer className="w-4 h-4 text-blue-500" />
-              <span>Print PDF</span>
+              <Printer className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden md:inline">Print</span>
             </button>
 
-            {/* Import Google Sheet / Excel */}
+            {/* Share Sheet */}
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 text-xs font-semibold shadow-2xs"
-              title="Import from Google Sheets / Excel (.xlsx / .csv)"
+              onClick={handleShareSheet}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                isLinkCopied
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-700 dark:text-indigo-300 hover:border-indigo-400'
+              }`}
+              title="Copy shareable link"
             >
-              <Upload className="w-4 h-4 text-indigo-500" />
-              <span className="hidden sm:inline">Import</span>
+              {isLinkCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="hidden sm:inline">Share</span>
+                </>
+              )}
             </button>
 
-            {/* Clear Sheet */}
-            <button
-              onClick={() => {
-                if (window.confirm('Clear all data on this sheet and reset?')) {
-                  if (isRawMode) {
-                    setRawGridData({});
-                    localStorage.removeItem(`jamia_raw_grid_${activeSheetTabId}`);
-                  } else {
-                    clearAllTransactions();
-                  }
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 text-xs font-semibold transition-colors"
-              title="Reset this sheet"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Clear</span>
-            </button>
+            {/* Overflow '••• More' Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsMoreActionsOpen(!isMoreActionsOpen)}
+                className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors shadow-2xs cursor-pointer"
+                title="More actions"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {isMoreActionsOpen && (
+                <div 
+                  className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 z-50 text-xs font-semibold"
+                  onMouseLeave={() => setIsMoreActionsOpen(false)}
+                >
+                  {!isRawMode && (
+                    <button
+                      onClick={() => {
+                        rewriteReceiptNumbersAscending();
+                        setIsMoreActionsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      <Hash className="w-4 h-4 text-amber-500" />
+                      <span>Renumber Receipts (1, 2, 3...)</span>
+                    </button>
+                  )}
+
+                    <button
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                        setIsMoreActionsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 text-indigo-500" />
+                      <span>Import Excel / CSV</span>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+
+                    <button
+                      onClick={() => {
+                        setIsMoreActionsOpen(false);
+                        if (window.confirm('Clear all data on this sheet and reset?')) {
+                          if (isRawMode) {
+                            setRawGridData({});
+                            localStorage.removeItem(`jamia_raw_grid_${activeSheetTabId}`);
+                          } else {
+                            clearAllTransactions();
+                          }
+                        }
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Clear Sheet Data</span>
+                    </button>
+                </div>
+              )}
+            </div>
 
           </div>
         </div>
 
         {/* TEMPLATE FILTER BAR (When in Template Mode) */}
         {!isRawMode && (
-          <div className="flex flex-wrap items-center justify-between p-2 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 gap-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between p-2.5 sm:px-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 gap-2.5 text-xs">
             
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Search Box on Left */}
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 left-2.5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search donor, receipt, remarks..."
+                className="w-full py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 pl-8 pr-7"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute top-2 right-2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Slicers on Right */}
+            <div className="flex flex-wrap items-center gap-2">
               {/* Type filter */}
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value as any)}
-                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                className="py-1.5 px-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none"
               >
                 <option value="all">All Types</option>
                 <option value="income">Income Only</option>
                 <option value="expense">Expense Only</option>
               </select>
 
-              {/* Branch Slicer (if available) */}
-              {availableBranches.length > 0 && (
-                <select
-                  value={selectedBranch}
-                  onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold max-w-[140px]"
-                  title="Filter by Branch"
-                >
-                  <option value="all">🏢 All Branches</option>
-                  {availableBranches.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Accounting Contribution Status Slicer */}
+              {/* Accounting Contribution Status */}
               <select
                 value={selectedAccountingStatus}
                 onChange={(e) => setSelectedAccountingStatus(e.target.value as any)}
-                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
-                title="Filter by Member Contribution Status"
+                className="py-1.5 px-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none"
               >
-                <option value="all">📊 All Statuses</option>
+                <option value="all">All Statuses</option>
                 <option value="paid">✓ Fully Paid</option>
                 <option value="due">⚠️ Balance Due</option>
                 <option value="unpaid">✗ Unpaid</option>
@@ -1746,26 +1599,24 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               <select
                 value={selectedPaymentMode}
                 onChange={(e) => setSelectedPaymentMode(e.target.value)}
-                className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                className="py-1.5 px-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none"
               >
                 <option value="all">All Modes</option>
-                <option value="Online">Online Transfer</option>
                 <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
                 <option value="Cheque">Cheque</option>
-                <option value="DD">Demand Draft (DD)</option>
+                <option value="Online">Online</option>
               </select>
 
-              {/* Rows Per Page Limit Selector in Filter Bar */}
-              <div className="flex items-center gap-1 pl-1 border-l border-slate-300 dark:border-slate-700">
-                <span className="text-slate-400 font-bold hidden sm:inline">Limit:</span>
+              {/* Limit & Pagination */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1">
                 <select
                   value={rowLimit}
                   onChange={(e) => {
                     setRowLimit(e.target.value as any);
                     setCurrentPage(1);
                   }}
-                  className="py-1 px-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-blue-600 dark:text-blue-400"
-                  title="Limit rows per page"
+                  className="bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none cursor-pointer"
                 >
                   <option value="25">25 rows</option>
                   <option value="50">50 rows</option>
@@ -1774,52 +1625,29 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   <option value="500">500 rows</option>
                   <option value="all">All ({totalTemplateRows})</option>
                 </select>
+
+                {rowLimit !== 'all' && totalPages > 1 && (
+                  <div className="flex items-center gap-1 pl-1 border-l border-slate-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      className="text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:text-emerald-600 font-bold px-0.5 cursor-pointer"
+                    >
+                      ◀
+                    </button>
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      {safePage}/{totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                      className="text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:text-emerald-600 font-bold px-0.5 cursor-pointer"
+                    >
+                      ▶
+                    </button>
+                  </div>
+                )}
               </div>
-
-              {/* Quick Prev / Next Pagination in Filter Bar */}
-              {rowLimit !== 'all' && totalPages > 1 && (
-                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-0.5">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={safePage <= 1}
-                    className="text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:text-blue-600 font-bold px-1"
-                    title="Previous page"
-                  >
-                    ◀
-                  </button>
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                    {safePage}/{totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={safePage >= totalPages}
-                    className="text-slate-600 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:text-blue-600 font-bold px-1"
-                    title="Next page"
-                  >
-                    ▶
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Search Box */}
-            <div className="relative min-w-[220px]">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 left-2.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search in ledger..."
-                className="w-full py-1 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none pl-8 pr-2"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute top-2 right-2 text-slate-400"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
             </div>
 
           </div>
