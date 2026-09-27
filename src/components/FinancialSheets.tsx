@@ -40,7 +40,7 @@ import {
   CheckCircle2,
   MoreHorizontal
 } from 'lucide-react';
-import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey } from '../types/finance';
+import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey, COMMON_PROFESSIONS } from '../types/finance';
 
 export type AccountingColKey = 
   | 'donorName' 
@@ -49,6 +49,7 @@ export type AccountingColKey =
   | 'phone' 
   | 'receiptNo' 
   | 'sarparastAla' 
+  | 'profession'
   | 'monthlyAmount' 
   | 'quarterlyAmount' 
   | 'annuallyAmount' 
@@ -68,6 +69,7 @@ import {
   exportRawGridToExcel,
   printRawGridAsPDF
 } from '../utils/exportUtils';
+import { api } from '../services/api';
 
 const PUNJAB_CITIES_PRESET = [
   'Lahore', 'Faisalabad', 'Rawalpindi', 'Gujranwala', 'Multan',
@@ -85,7 +87,7 @@ export const parseMoneyInput = (val: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
-// 27 Complete Accounting Columns (A-AA) matching exact requested format
+// 28 Complete Accounting Columns (A-AB) matching exact requested format
 export const ACCOUNTING_COLUMNS: { 
   letter: string; 
   key: AccountingColKey; 
@@ -100,27 +102,28 @@ export const ACCOUNTING_COLUMNS: {
   { letter: 'D', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
   { letter: 'E', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24', align: 'center' },
   { letter: 'F', key: 'sarparastAla', titleEn: 'Sarparast-e-Ala', titleUr: 'سرپرست اعلیٰ', width: 'w-36' },
-  { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
-  { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
-  { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
-  { letter: 'J', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
-  { letter: 'K', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
-  { letter: 'L', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
-  { letter: 'M', key: 'apr', titleEn: 'Apr', titleUr: 'اپریل', width: 'w-20', align: 'right' },
-  { letter: 'N', key: 'may', titleEn: 'May', titleUr: 'مئی', width: 'w-20', align: 'right' },
-  { letter: 'O', key: 'jun', titleEn: 'Jun', titleUr: 'جون', width: 'w-20', align: 'right' },
-  { letter: 'P', key: 'jul', titleEn: 'Jul', titleUr: 'جولائی', width: 'w-20', align: 'right' },
-  { letter: 'Q', key: 'aug', titleEn: 'Aug', titleUr: 'اگست', width: 'w-20', align: 'right' },
-  { letter: 'R', key: 'sep', titleEn: 'Sep', titleUr: 'ستمبر', width: 'w-20', align: 'right' },
-  { letter: 'S', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
-  { letter: 'T', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
-  { letter: 'U', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
-  { letter: 'V', key: 'amount', titleEn: 'Money Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
-  { letter: 'W', key: 'targetAmount', titleEn: 'Target Money', titleUr: 'معینہ ہدف', width: 'w-28', align: 'right' },
-  { letter: 'X', key: 'balance', titleEn: 'Total Remaining', titleUr: 'بقایا واجب الادا', width: 'w-28', align: 'right' },
-  { letter: 'Y', key: 'paymentMode', titleEn: 'Mode', titleUr: 'طریقہ', width: 'w-24', align: 'center' },
-  { letter: 'Z', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
-  { letter: 'AA', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
+  { letter: 'G', key: 'profession', titleEn: 'Profession', titleUr: 'شعبہ / پیشہ', width: 'w-36' },
+  { letter: 'H', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
+  { letter: 'I', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
+  { letter: 'J', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
+  { letter: 'K', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
+  { letter: 'L', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
+  { letter: 'M', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
+  { letter: 'N', key: 'apr', titleEn: 'Apr', titleUr: 'اپریل', width: 'w-20', align: 'right' },
+  { letter: 'O', key: 'may', titleEn: 'May', titleUr: 'مئی', width: 'w-20', align: 'right' },
+  { letter: 'P', key: 'jun', titleEn: 'Jun', titleUr: 'جون', width: 'w-20', align: 'right' },
+  { letter: 'Q', key: 'jul', titleEn: 'Jul', titleUr: 'جولائی', width: 'w-20', align: 'right' },
+  { letter: 'R', key: 'aug', titleEn: 'Aug', titleUr: 'اگست', width: 'w-20', align: 'right' },
+  { letter: 'S', key: 'sep', titleEn: 'Sep', titleUr: 'ستمبر', width: 'w-20', align: 'right' },
+  { letter: 'T', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
+  { letter: 'U', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
+  { letter: 'V', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
+  { letter: 'W', key: 'amount', titleEn: 'Money Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
+  { letter: 'X', key: 'targetAmount', titleEn: 'Target Money', titleUr: 'معینہ ہدف', width: 'w-28', align: 'right' },
+  { letter: 'Y', key: 'balance', titleEn: 'Total Remaining', titleUr: 'بقایا واجب الادا', width: 'w-28', align: 'right' },
+  { letter: 'Z', key: 'paymentMode', titleEn: 'Mode', titleUr: 'طریقہ', width: 'w-24', align: 'center' },
+  { letter: 'AA', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
+  { letter: 'AB', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
 ];
 
 export interface FinancialSheetsProps {
@@ -334,6 +337,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     }
   }, [activeSheetTabId]);
 
+  const rawSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleRawCellChange = (row: number, col: string, val: string) => {
     setRawGridData(prev => {
       const updated = {
@@ -348,6 +353,16 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       } catch (e) {
         console.error(e);
       }
+
+      // Debounced background sync to Neon DB shared storage
+      if (rawSaveTimerRef.current) clearTimeout(rawSaveTimerRef.current);
+      rawSaveTimerRef.current = setTimeout(() => {
+        const sheetName = currentSheetTab?.name || `Sheet ${currentSheetNumber}`;
+        api.saveSharedSheet(activeSheetTabId, sheetName, updated, rawRowCount).catch(err => {
+          console.error('Failed to sync raw sheet to Neon DB:', err);
+        });
+      }, 700);
+
       return updated;
     });
   };
@@ -360,6 +375,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       } catch (e) {
         console.error(e);
       }
+      const sheetName = currentSheetTab?.name || `Sheet ${currentSheetNumber}`;
+      api.saveSharedSheet(activeSheetTabId, sheetName, rawGridData, next).catch(err => {
+        console.error('Failed to update row count in Neon DB:', err);
+      });
       return next;
     });
   };
@@ -2438,10 +2457,41 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column G: Monthly Pledged */}
+                        {/* Column G: Profession (شعبہ / پیشہ) */}
+                        <td 
+                          id={`cell-${tx.id}-profession`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'profession', 'G')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'profession')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'profession' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'profession' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              list="profession-list"
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'profession', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'profession', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                              placeholder="Select or enter profession..."
+                            />
+                          ) : (
+                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                              {tx.profession || '—'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'profession' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column H: Monthly Pledged */}
                         <td 
                           id={`cell-${tx.id}-monthlyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'G')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'H')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'monthlyAmount')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2467,10 +2517,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column H: Quarterly Pledged */}
+                        {/* Column I: Quarterly Pledged */}
                         <td 
                           id={`cell-${tx.id}-quarterlyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'H')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'I')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'quarterlyAmount')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2496,10 +2546,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column I: Annually Pledged */}
+                        {/* Column J: Annually Pledged */}
                         <td 
                           id={`cell-${tx.id}-annuallyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'I')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'J')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'annuallyAmount')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2525,9 +2575,9 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Columns J through U: 12 Months Breakdown */}
+                        {/* Columns K through V: 12 Months Breakdown */}
                         {MONTH_KEYS.map((mKey, mIdx) => {
-                          const letter = String.fromCharCode(74 + mIdx); // 'J' to 'U'
+                          const letter = String.fromCharCode(75 + mIdx); // 'K' to 'V'
                           const mVal = tx.monthsData?.[mKey] || 0;
                           const isFocused = focusedMonth === mKey;
                           const isCellEditing = editingCell?.rowId === tx.id && editingCell.colKey === mKey;
@@ -2567,10 +2617,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           );
                         })}
 
-                        {/* Column V: Money Paid (Calculated) */}
+                        {/* Column W: Money Paid (Calculated) */}
                         <td 
                           id={`cell-${tx.id}-amount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'V')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'W')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none bg-emerald-50/30 dark:bg-emerald-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
@@ -2583,10 +2633,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column W: Target Money */}
+                        {/* Column X: Target Money */}
                         <td 
                           id={`cell-${tx.id}-targetAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'targetAmount', 'W')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'targetAmount', 'X')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'targetAmount')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'targetAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2612,10 +2662,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column X: Total Remaining (Balance Due) */}
+                        {/* Column Y: Total Remaining (Balance Due) */}
                         <td 
                           id={`cell-${tx.id}-balance`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'X')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'Y')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
@@ -2634,10 +2684,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column Y: Mode */}
+                        {/* Column Z: Mode */}
                         <td 
                           id={`cell-${tx.id}-paymentMode`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'Y')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'Z')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-center relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
@@ -2657,10 +2707,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column Z: Bank Name */}
+                        {/* Column AA: Bank Name */}
                         <td 
                           id={`cell-${tx.id}-bankName`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'Z')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'AA')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'bankName')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2684,10 +2734,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column AA: Remarks */}
+                        {/* Column AB: Remarks */}
                         <td 
                           id={`cell-${tx.id}-notes`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'AA')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'AB')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'notes')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2723,48 +2773,48 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   <td className="p-2.5 text-center bg-slate-950 border-r border-slate-800 sticky left-0 z-30">
                     TOTAL
                   </td>
-                  <td colSpan={6} className="p-2.5 border-r border-slate-800 text-slate-300 font-sans">
+                  <td colSpan={7} className="p-2.5 border-r border-slate-800 text-slate-300 font-sans">
                     Showing {displayedTransactions.length} of {filteredTransactions.length} members
                   </td>
-                  {/* Col G: Monthly Commitments */}
+                  {/* Col H: Monthly Commitments */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-blue-300">
                     ₨ {summaryStats.monthlyCommitmentsSum.toLocaleString()}
                   </td>
-                  {/* Col H: Quarterly Commitments */}
+                  {/* Col I: Quarterly Commitments */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-indigo-300">
                     ₨ {summaryStats.quarterlyCommitmentsSum.toLocaleString()}
                   </td>
-                  {/* Col I: Annually Commitments */}
+                  {/* Col J: Annually Commitments */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-white font-black">
                     ₨ {summaryStats.annuallyCommitmentsSum.toLocaleString()}
                   </td>
-                  {/* Cols J through U: 12 Month Totals */}
+                  {/* Cols K through V: 12 Month Totals */}
                   {MONTH_KEYS.map((mKey) => (
                     <td key={mKey} className="p-2 text-right border-r border-slate-800 text-emerald-400">
                       {summaryStats.monthSums[mKey] > 0 ? `₨ ${(summaryStats.monthSums[mKey] / 1000).toFixed(summaryStats.monthSums[mKey] >= 10000 ? 0 : 1)}k` : '—'}
                     </td>
                   ))}
-                  {/* Col V: Total Collected (Money Paid) */}
+                  {/* Col W: Total Collected (Money Paid) */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-emerald-300 font-black">
                     ₨ {summaryStats.totalPaid.toLocaleString()}
                   </td>
-                  {/* Col W: Target Money Total */}
+                  {/* Col X: Target Money Total */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-blue-300 font-black">
                     ₨ {summaryStats.totalPledged.toLocaleString()}
                   </td>
-                  {/* Col X: Total Remaining */}
+                  {/* Col Y: Total Remaining */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-amber-300 font-black">
                     ₨ {summaryStats.totalBalance.toLocaleString()}
                   </td>
-                  {/* Col Y: Payment Mode Summary */}
+                  {/* Col Z: Payment Mode Summary */}
                   <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
                     Cash: {Math.round((summaryStats.cashTotal / (summaryStats.totalPaid || 1)) * 100)}%
                   </td>
-                  {/* Col Z: Bank Summary */}
+                  {/* Col AA: Bank Summary */}
                   <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
                     Bank: {Math.round((summaryStats.bankTotal / (summaryStats.totalPaid || 1)) * 100)}%
                   </td>
-                  {/* Col AA: Remarks */}
+                  {/* Col AB: Remarks */}
                   <td className="p-2 text-center text-emerald-400 font-sans text-xs">
                     {summaryStats.collectionRate}% Realized
                   </td>
@@ -2772,6 +2822,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               </tfoot>
 
             </table>
+
+            {/* Datalist autocomplete for Profession column */}
+            <datalist id="profession-list">
+              {COMMON_PROFESSIONS.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
           </div>
 
           </div>

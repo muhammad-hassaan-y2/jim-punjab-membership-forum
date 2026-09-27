@@ -17,6 +17,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         zila = COALESCE(${tx.zila}, zila),
         phone = COALESCE(${tx.phone}, phone),
         sarparast_ala = COALESCE(${tx.sarparastAla}, sarparast_ala),
+        profession = COALESCE(${tx.profession}, profession),
         address = COALESCE(${tx.address}, address),
         address_urdu = COALESCE(${tx.addressUrdu}, address_urdu),
         monthly_amount = COALESCE(${tx.monthlyAmount !== undefined ? Number(tx.monthlyAmount) : null}, monthly_amount),

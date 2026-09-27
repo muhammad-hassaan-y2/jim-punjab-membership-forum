@@ -67,6 +67,7 @@ export interface Transaction {
   zila?: string; // ضلع / District
   phone: string; // فون نمبر
   sarparastAla?: string; // سرپرست اعلیٰ
+  profession?: string; // پیشہ / شعبہ (Profession / Category)
   address: string; // مکمل پتہ
   city?: string; // شہر
   reference?: string; // بتوسط (legacy/optional)
@@ -157,3 +158,20 @@ export interface DonorSummary {
   preferredCategory: string;
   reference: string;
 }
+
+export const COMMON_PROFESSIONS = [
+  'Business / کاروبار',
+  'Govt Service / سرکاری ملازمت',
+  'Private Job / پرائیویٹ ملازمت',
+  'Scholar / Ulama / عالم دین',
+  'Teacher / Educator / استاد',
+  'Doctor / Physician / ڈاکٹر',
+  'Engineer / انجینئر',
+  'Lawyer / Advocate / وکیل',
+  'Trader / Shopkeeper / تاجر',
+  'Agriculture / Farmer / زمیندار',
+  'Overseas / بیرون ملک',
+  'Student / طالب علم',
+  'Other / دیگر',
+] as const;
+

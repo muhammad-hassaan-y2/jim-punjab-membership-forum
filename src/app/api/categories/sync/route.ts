@@ -12,8 +12,8 @@ export async function POST(req: Request) {
           INSERT INTO categories (id, name, name_urdu, type, color, is_zakat_eligible, description, description_urdu)
           VALUES (
             ${c.id}, 
-            ${c.name}, 
-            ${c.nameUrdu || c.name}, 
+            ${c.nameEnglish || c.name || 'Category'}, 
+            ${c.nameUrdu || c.nameEnglish || c.name || 'Category'}, 
             ${c.type}, 
             ${c.color || '#0284c7'}, 
             ${c.isZakatEligible || false}, 

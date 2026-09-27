@@ -262,6 +262,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error(e);
     }
+    // Persist directly to Neon PostgreSQL DB
+    api.createProject(newProj).catch(err => {
+      console.error('Failed to save project to Neon DB:', err);
+    });
     return newProj;
   };
 
@@ -283,6 +287,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error(e);
     }
+    // Persist directly to Neon PostgreSQL DB in organization_config
+    api.saveConfig({
+      ...orgConfig,
+      targetToCollect: val,
+    } as any).catch(err => {
+      console.error('Failed to save targetToCollect to Neon DB:', err);
+    });
   };
 
   // Modals
@@ -306,10 +317,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       // Load DB records
-      const [dbTxs, dbSheets, dbConfig] = await Promise.allSettled([
+      const [dbTxs, dbSheets, dbConfig, dbProjects, dbCategories] = await Promise.allSettled([
         api.getTransactions(),
         api.getSheets(),
         api.getConfig(),
+        api.getProjects(),
+        api.getCategories(),
       ]);
 
       if (dbTxs.status === 'fulfilled') {
@@ -360,6 +373,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
+      if (dbProjects.status === 'fulfilled' && dbProjects.value.length > 0) {
+        setProjects(dbProjects.value);
+        if (!activeProjectId || !dbProjects.value.some(p => p.id === activeProjectId)) {
+          setActiveProjectIdState(dbProjects.value[0].id);
+        }
+      }
+
+      if (dbCategories.status === 'fulfilled' && dbCategories.value.length > 0) {
+        setCategories(dbCategories.value);
+      }
+
       if (dbConfig.status === 'fulfilled' && dbConfig.value) {
         setOrgConfig({
           ...defaultOrgConfig,
@@ -369,6 +393,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           nameUrdu: 'جماعت اصلاح المسلمین پنجاب',
           subHeaderUrdu: 'پنجاب زون (Punjab Zone)',
         });
+        if ((dbConfig.value as any).targetToCollect) {
+          setTargetToCollectState(Number((dbConfig.value as any).targetToCollect));
+        }
       }
     } catch (err) {
       console.error('Failed to load from Neon DB:', err);
@@ -643,6 +670,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           zila: defaultZila,
           phone: '',
           sarparastAla: '',
+          profession: '',
           address: '',
           city: defaultZila,
           reference: '',

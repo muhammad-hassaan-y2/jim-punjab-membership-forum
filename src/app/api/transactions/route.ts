@@ -16,6 +16,7 @@ export async function GET() {
         zila,
         phone,
         sarparast_ala as "sarparastAla",
+        profession,
         address,
         address_urdu as "addressUrdu",
         monthly_amount::float as "monthlyAmount",
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     
     await sql`
       INSERT INTO transactions (
-        id, sheet_id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, sarparast_ala, address, address_urdu,
+        id, sheet_id, receipt_no, date, donor_name, donor_name_urdu, branch_name, zila, phone, sarparast_ala, profession, address, address_urdu,
         monthly_amount, quarterly_amount, annually_amount, target_amount, months_data,
         amount, amount_in_words_en, amount_in_words_ur, type, category_id,
         payment_method, bank_name, check_number, transaction_id, description, description_urdu,
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
         ${tx.zila || ''},
         ${tx.phone || ''}, 
         ${tx.sarparastAla || ''}, 
+        ${tx.profession || ''},
         ${tx.address || ''}, 
         ${tx.addressUrdu || ''},
         ${Number(tx.monthlyAmount) || 0},

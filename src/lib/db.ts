@@ -50,6 +50,7 @@ export async function initDatabase() {
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS months_data JSONB DEFAULT '{}'`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sarparast_ala VARCHAR(255)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS target_amount NUMERIC(15, 2) DEFAULT 0`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS profession VARCHAR(255)`;
 
     // 2. Sheet Tabs table
     await sql`
@@ -124,13 +125,56 @@ export async function initDatabase() {
       )
     `;
 
-    // Ensure ali@markaz.com and admin@markaz.com are seeded
+    // 7. Financial Projects table
     await sql`
-      INSERT INTO users (id, name, email, password, role)
+      CREATE TABLE IF NOT EXISTS projects (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        year VARCHAR(50) DEFAULT '2026',
+        description TEXT,
+        target_amount NUMERIC(15, 2) DEFAULT 10000000,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // Ensure default project is seeded
+    await sql`
+      INSERT INTO projects (id, name, year, description, target_amount)
       VALUES 
-        ('usr_ali', 'Ali', 'ali@markaz.com', 'Ali@2026', 'admin'),
-        ('usr_admin', 'Admin (JIM Punjab)', 'admin@markaz.com', 'Markaz@2026', 'admin')
-      ON CONFLICT (email) DO NOTHING
+        ('proj-2026', 'JIM Punjab Official Districts & Zones 2026', '2026', 'Official Working Sheets for all Punjab districts and zones', 10000000)
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    // Ensure default organization_config is seeded
+    await sql`
+      INSERT INTO organization_config (id, data, updated_at)
+      VALUES ('default', ${JSON.stringify({
+        nameEnglish: 'JIM Punjab',
+        subHeaderEnglish: 'Jamaat Islahul Muslimeen Punjab',
+        nameUrdu: 'جماعت اصلاح المسلمین پنجاب',
+        subHeaderUrdu: 'پنجاب زون (Punjab Zone)',
+        addressEnglish: 'Markaz Rooh-ul-Islam, Punjab, Pakistan',
+        addressUrdu: 'مرکز روح الاسلام، پنجاب، پاکستان',
+        phone: '+92 300 1234567',
+        email: 'info@jimpunjab.org',
+        currency: 'PKR',
+        currencySymbol: 'Rs.',
+        receiptPrefix: 'JIM-PB-',
+        receiptCounter: 1,
+        targetToCollect: 10000000
+      })}, NOW())
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    // Ensure default categories are seeded if empty
+    await sql`
+      INSERT INTO categories (id, name, name_urdu, type, color, is_zakat_eligible, description)
+      VALUES 
+        ('membership', 'Membership Fund', 'ممبر شپ فنڈ', 'income', '#059669', false, 'Regular monthly/quarterly/annual subscriptions'),
+        ('zakat', 'Zakat Fund', 'زکوٰۃ فنڈ', 'income', '#d97706', true, 'Eligible for Shariah-compliant Zakat disbursement'),
+        ('sadqa', 'Sadqa / General Charity', 'صدقات و عطیات', 'income', '#2563eb', false, 'Voluntary general donations'),
+        ('operations', 'Administrative & Events', 'انتظامی و دعوتی اخراجات', 'expense', '#dc2626', false, 'Operational, venue, and logistical disbursements')
+      ON CONFLICT (id) DO NOTHING
     `;
 
     tablesInitialized = true;

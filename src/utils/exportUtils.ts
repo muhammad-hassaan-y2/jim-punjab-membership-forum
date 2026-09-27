@@ -33,6 +33,7 @@ export function exportTransactionsToExcel(
       'Phone / فون نمبر': t.phone || '',
       'Receipt No / رسید نمبر': t.receiptNo,
       'Sarparast-e-Ala / سرپرست اعلیٰ': t.sarparastAla || '',
+      'Profession / شعبہ / پیشہ': t.profession || '',
       'Monthly / ماہانہ رقم': t.monthlyAmount || 0,
       'Quarterly / سہ ماہی رقم': t.quarterlyAmount || 0,
       'Annually / سالانہ رقم': t.annuallyAmount || 0,
@@ -62,12 +63,13 @@ export function exportTransactionsToExcel(
   // Set column widths
   worksheet['!cols'] = [
     { wch: 6 },  // Sr #
-    { wch: 16 }, // Receipt No
-    { wch: 12 }, // Date
     { wch: 25 }, // Donor Name
     { wch: 20 }, // Branch
     { wch: 16 }, // Zila
     { wch: 16 }, // Phone
+    { wch: 16 }, // Receipt No
+    { wch: 22 }, // Sarparast-e-Ala
+    { wch: 22 }, // Profession
     { wch: 14 }, // Monthly
     { wch: 14 }, // Quarterly
     { wch: 14 }, // Annually
@@ -83,8 +85,9 @@ export function exportTransactionsToExcel(
     { wch: 10 }, // Oct
     { wch: 10 }, // Nov
     { wch: 10 }, // Dec
-    { wch: 16 }, // Total Paid
-    { wch: 16 }, // Balance Due
+    { wch: 16 }, // Money Paid
+    { wch: 16 }, // Target Money
+    { wch: 16 }, // Total Remaining
     { wch: 14 }, // Payment Mode
     { wch: 20 }, // Bank Name
     { wch: 28 }, // Notes
@@ -115,22 +118,48 @@ export function exportTransactionsToExcel(
 }
 
 export function exportTransactionsToCSV(transactions: Transaction[], fileName: string = 'financial_records') {
-  const headers = ['Receipt No', 'Date', 'Donor Name', 'Amount', 'Type', 'Category', 'Payment Mode', 'Bank', 'Reference', 'Status', 'Notes'];
+  const headers = [
+    'Sr #', 'Receipt No', 'Date', 'Donor Name', 'Branch', 'Zila', 'Phone',
+    'Sarparast-e-Ala', 'Profession', 'Monthly', 'Quarterly', 'Annually',
+    'Money Paid', 'Target Money', 'Total Remaining', 'Payment Mode', 'Bank', 'Remarks'
+  ];
   const csvRows = [
     headers.join(','),
-    ...transactions.map(t => [
-      `"${t.receiptNo}"`,
-      `"${t.date}"`,
-      `"${(t.donorNameUrdu || t.donorName).replace(/"/g, '""')}"`,
-      t.amount,
-      `"${t.type}"`,
-      `"${t.categoryId}"`,
-      `"${t.paymentMode}"`,
-      `"${(t.bankName || '').replace(/"/g, '""')}"`,
-      `"${(t.reference || '').replace(/"/g, '""')}"`,
-      `"${t.status}"`,
-      `"${(t.notes || '').replace(/"/g, '""')}"`,
-    ].join(','))
+    ...transactions.map((t, index) => {
+      const months = t.monthsData || {};
+      const target = (t.targetAmount !== undefined && t.targetAmount > 0)
+        ? t.targetAmount
+        : (t.annuallyAmount && t.annuallyAmount > 0 
+            ? t.annuallyAmount 
+            : (t.quarterlyAmount && t.quarterlyAmount > 0 
+                ? t.quarterlyAmount * 4 
+                : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount)));
+      const paid = Object.values(months).length > 0 
+        ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+        : Number(t.amount || 0);
+      const balance = Math.max(0, target - paid);
+
+      return [
+        index + 1,
+        `"${t.receiptNo || ''}"`,
+        `"${t.date || ''}"`,
+        `"${(t.donorNameUrdu || t.donorName || '').replace(/"/g, '""')}"`,
+        `"${(t.branchName || '').replace(/"/g, '""')}"`,
+        `"${(t.zila || t.city || '').replace(/"/g, '""')}"`,
+        `"${(t.phone || '').replace(/"/g, '""')}"`,
+        `"${(t.sarparastAla || '').replace(/"/g, '""')}"`,
+        `"${(t.profession || '').replace(/"/g, '""')}"`,
+        t.monthlyAmount || 0,
+        t.quarterlyAmount || 0,
+        t.annuallyAmount || 0,
+        paid,
+        target,
+        balance,
+        `"${t.paymentMode || 'Cash'}"`,
+        `"${(t.bankName || '').replace(/"/g, '""')}"`,
+        `"${(t.notes || '').replace(/"/g, '""')}"`,
+      ].join(',');
+    })
   ];
 
   const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -308,7 +337,7 @@ export function printSheetAsPDF(
   const totalBalanceDue = Math.max(0, totalPledged - totalPaidSum);
 
   const tableRowsHtml = transactions.length === 0
-    ? `<tr><td colspan="15" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
+    ? `<tr><td colspan="17" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
     : transactions.map((t, index) => {
         const months = t.monthsData || {};
         const tgt = t.annuallyAmount && t.annuallyAmount > 0 
@@ -330,6 +359,8 @@ export function printSheetAsPDF(
             <td style="padding: 4px 5px; color: #334155;">${t.branchName || '---'}</td>
             <td style="padding: 4px 5px; color: #334155;">${t.zila || t.city || '---'}</td>
             <td style="padding: 4px 5px; font-family: monospace;">${t.phone || '---'}</td>
+            <td style="padding: 4px 5px; color: #047857; font-weight: 600;">${t.sarparastAla || '---'}</td>
+            <td style="padding: 4px 5px; color: #334155;">${t.profession || '---'}</td>
             <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.monthlyAmount ? Number(t.monthlyAmount).toLocaleString() : '-'}</td>
             <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? Number(t.quarterlyAmount).toLocaleString() : '-'}</td>
             <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.annuallyAmount ? Number(t.annuallyAmount).toLocaleString() : '-'}</td>
@@ -493,6 +524,8 @@ export function printSheetAsPDF(
               <th>Branch</th>
               <th>Zila</th>
               <th>Phone</th>
+              <th>Sarparast-e-Ala</th>
+              <th>Profession</th>
               <th style="text-align: right;">Monthly</th>
               <th style="text-align: right;">Quarterly</th>
               <th style="text-align: right;">Annually</th>

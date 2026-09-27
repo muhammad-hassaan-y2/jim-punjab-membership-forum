@@ -1,4 +1,4 @@
-import { Transaction, SheetTab, FundCategory, OrganizationConfig } from '../types/finance';
+import { Transaction, SheetTab, FundCategory, OrganizationConfig, FinancialProject } from '../types/finance';
 
 const BASE_URL = '/api';
 
@@ -136,5 +136,49 @@ export const api = {
       body: JSON.stringify(config),
     });
     if (!res.ok) throw new Error('Failed to save organization config');
+  },
+
+  // Financial Projects (Neon DB)
+  async getProjects(): Promise<FinancialProject[]> {
+    const res = await fetch(`${BASE_URL}/projects`);
+    if (!res.ok) throw new Error('Failed to fetch projects from Neon DB');
+    return await res.json();
+  },
+
+  async createProject(project: Partial<FinancialProject>): Promise<FinancialProject> {
+    const res = await fetch(`${BASE_URL}/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(project),
+    });
+    if (!res.ok) throw new Error('Failed to create project in Neon DB');
+    return await res.json();
+  },
+
+  async deleteProject(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/projects?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete project from Neon DB');
+  },
+
+  // Shared / Raw Sheets (Neon DB)
+  async getSharedSheet(id: string): Promise<{ id: string; name: string; data: any; rowCount: number } | null> {
+    try {
+      const res = await fetch(`${BASE_URL}/shared/${encodeURIComponent(id)}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async saveSharedSheet(id: string, name: string, data: any, rowCount: number = 100): Promise<void> {
+    const res = await fetch(`${BASE_URL}/shared/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, data, rowCount }),
+    });
+    if (!res.ok) throw new Error('Failed to save shared sheet in Neon DB');
   },
 };
