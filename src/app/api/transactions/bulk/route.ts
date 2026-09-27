@@ -75,6 +75,7 @@ export async function POST(req: Request) {
               zila = EXCLUDED.zila,
               phone = EXCLUDED.phone,
               sarparast_ala = EXCLUDED.sarparast_ala,
+              profession = EXCLUDED.profession,
               address = EXCLUDED.address,
               address_urdu = EXCLUDED.address_urdu,
               monthly_amount = EXCLUDED.monthly_amount,
