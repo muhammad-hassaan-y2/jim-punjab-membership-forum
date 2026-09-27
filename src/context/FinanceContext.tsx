@@ -610,65 +610,73 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addBlankRow = async (count: number = 1) => {
     setDbStatus('syncing');
-    const newRows: Transaction[] = [];
     const activeTab = sheetTabs.find(t => t.id === activeSheetTabId);
     const defaultBranch = activeTab?.name || 'Main Branch';
     const cleanCityFromSheet = activeTab?.cityName || (activeTab?.name ? activeTab.name.replace(/\s*\(.*?\)/, '').trim() : 'Lahore');
     const defaultZila = cleanCityFromSheet || 'Lahore';
 
-    // Sheet-specific receipt numbering starting from 1
-    const sheetTxs = transactions.filter(t => t.sheetId === activeTab?.id || (activeTab?.cityName && t.zila === activeTab.cityName));
-    const nums = sheetTxs.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
-    const startNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
-    for (let i = 0; i < count; i++) {
-      const receiptNo = String(startNum + i);
-      newRows.push({
-        id: `tx-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
-        sheetId: activeTab?.id,
-        receiptNo: receiptNo,
-        date: todayStr,
-        donorName: '',
-        donorNameUrdu: '',
-        branchName: defaultBranch,
-        zila: defaultZila,
-        phone: '',
-        address: '',
-        city: defaultZila,
-        reference: '',
-        preferredPeriod: 'Monthly',
-        monthlyAmount: 0,
-        quarterlyAmount: 0,
-        halfYearlyAmount: 0,
-        annuallyAmount: 0,
-        monthsData: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 },
-        amount: 0,
-        amountInWordsUrdu: '',
-        amountInWordsEnglish: '',
-        categoryId: 'membership',
-        paymentMode: 'Cash',
-        bankName: '',
-        chequeOrTxnNo: '',
-        type: 'income',
-        status: 'verified',
-        notes: '',
-        createdAt: new Date(Date.now() + i * 50).toISOString(),
-      });
-    }
+    let createdRows: Transaction[] = [];
 
-    setTransactions(prev => [...prev, ...newRows]);
-    setOrgConfig(prev => ({ ...prev, receiptCounter: startNum + count }));
-    if (newRows.length > 0 && !activeReceiptTransaction) {
-      setActiveReceiptTransaction(newRows[0]);
+    setTransactions(prev => {
+      // Sheet-specific receipt numbering computed from latest state snapshot
+      const sheetTxs = prev.filter(t => t.sheetId === activeTab?.id || (activeTab?.cityName && t.zila === activeTab.cityName));
+      const nums = sheetTxs.map(t => parseInt(String(t.receiptNo || '').replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+      const startNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+
+      createdRows = [];
+      for (let i = 0; i < count; i++) {
+        const receiptNo = String(startNum + i);
+        createdRows.push({
+          id: `tx-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
+          sheetId: activeTab?.id,
+          receiptNo: receiptNo,
+          date: todayStr,
+          donorName: '',
+          donorNameUrdu: '',
+          branchName: defaultBranch,
+          zila: defaultZila,
+          phone: '',
+          sarparastAla: '',
+          address: '',
+          city: defaultZila,
+          reference: '',
+          preferredPeriod: 'Monthly',
+          monthlyAmount: 0,
+          quarterlyAmount: 0,
+          halfYearlyAmount: 0,
+          annuallyAmount: 0,
+          targetAmount: 0,
+          monthsData: { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 },
+          amount: 0,
+          amountInWordsUrdu: '',
+          amountInWordsEnglish: '',
+          categoryId: 'membership',
+          paymentMode: 'Cash',
+          bankName: '',
+          chequeOrTxnNo: '',
+          type: 'income',
+          status: 'verified',
+          notes: '',
+          createdAt: new Date(Date.now() + i * 50).toISOString(),
+        });
+      }
+      return [...prev, ...createdRows];
+    });
+
+    if (createdRows.length > 0 && !activeReceiptTransaction) {
+      setActiveReceiptTransaction(createdRows[0]);
     }
 
     try {
-      await api.bulkSaveTransactions(newRows, false);
+      if (createdRows.length > 0) {
+        await api.bulkSaveTransactions(createdRows, false);
+      }
       setDbStatus('connected');
     } catch (err) {
       console.error('Failed to save blank rows in Neon DB:', err);
@@ -713,6 +721,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     cellUpdateTimerRef.current[id] = setTimeout(async () => {
+      delete cellUpdateTimerRef.current[id];
       try {
         setDbStatus('syncing');
         await api.updateTransaction(id, txData);
@@ -730,6 +739,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteTransaction = async (id: string) => {
+    const prevTxs = [...transactions];
+    const prevActive = activeReceiptTransaction;
     setTransactions(prev => prev.filter(item => item.id !== id));
     if (activeReceiptTransaction?.id === id) {
       const remaining = transactions.filter(t => t.id !== id);
@@ -741,6 +752,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setDbStatus('connected');
     } catch (err) {
       console.error('Failed to delete transaction from Neon DB:', err);
+      // Rollback on failure
+      setTransactions(prevTxs);
+      setActiveReceiptTransaction(prevActive);
       setDbStatus('error');
     }
   };

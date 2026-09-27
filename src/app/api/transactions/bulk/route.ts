@@ -5,8 +5,17 @@ export async function POST(req: Request) {
   try {
     await initDatabase();
     const { transactions: list, replaceAll } = await req.json();
+    if (Array.isArray(list) && list.length > 5000) {
+      return NextResponse.json({ error: 'Payload too large. Maximum 5000 records per bulk request.' }, { status: 413 });
+    }
+
     if (replaceAll) {
-      await sql`DELETE FROM transactions`;
+      const targetSheetId = list?.[0]?.sheetId;
+      if (targetSheetId) {
+        await sql`DELETE FROM transactions WHERE sheet_id = ${targetSheetId}`;
+      } else {
+        await sql`DELETE FROM transactions`;
+      }
     }
 
     if (Array.isArray(list) && list.length > 0) {

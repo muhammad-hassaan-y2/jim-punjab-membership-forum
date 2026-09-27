@@ -541,8 +541,17 @@ export function exportRawGridToExcel(
   rowCount: number,
   colLetters: string[]
 ) {
+  let lastNonEmptyRow = 1;
+  for (let r = rowCount; r >= 1; r--) {
+    if (colLetters.some(col => !!gridData[r]?.[col]?.trim())) {
+      lastNonEmptyRow = r;
+      break;
+    }
+  }
+
   const rows: Record<string, string>[] = [];
-  for (let r = 1; r <= rowCount; r++) {
+  const exportCount = Math.max(lastNonEmptyRow, 1);
+  for (let r = 1; r <= exportCount; r++) {
     const rowObj: Record<string, string> = { 'Row #': String(r) };
     colLetters.forEach(col => {
       rowObj[col] = gridData[r]?.[col] || '';
@@ -584,8 +593,16 @@ export function printRawGridAsPDF(
     tableHeaderHtml += `<th style="text-align: center;">Col ${col}</th>`;
   });
 
+  let lastNonEmptyRow = 1;
+  for (let r = rowCount; r >= 1; r--) {
+    if (colLetters.some(col => !!gridData[r]?.[col]?.trim())) {
+      lastNonEmptyRow = r;
+      break;
+    }
+  }
+  const maxRowToShow = Math.max(lastNonEmptyRow, 10);
+
   let tableRowsHtml = '';
-  const maxRowToShow = Math.min(rowCount, 50);
   for (let r = 1; r <= maxRowToShow; r++) {
     let rowCellsHtml = `<td style="text-align: center; font-weight: bold; background: #f8fafc;">${r}</td>`;
     activeCols.forEach(col => {

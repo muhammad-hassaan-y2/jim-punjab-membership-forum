@@ -44,32 +44,51 @@ export async function POST(req: Request) {
     }
 
     // Built-in institutional accounts fallback if not found in db query
-    if (
-      email === 'ali@markaz.com' &&
-      (password === 'Ali@2026' || password.toLowerCase() === 'ali@2026' || password === 'ali2026' || password === 'Markaz@2026')
-    ) {
-      return NextResponse.json({
-        success: true,
-        user: {
-          id: 'usr_ali',
-          name: 'Ali',
-          email: 'ali@markaz.com',
-          role: 'admin',
-        },
-      });
-    }
+    const institutionalAccounts = [
+      {
+        email: 'ali@markaz.com',
+        passwords: ['ali@2026', 'ali2026', 'markaz@2026'],
+        id: 'usr_ali',
+        name: 'Ali (Admin / JIM Punjab)',
+        role: 'admin',
+      },
+      {
+        email: 'admin@markaz.com',
+        passwords: ['markaz@2026', 'markaz2026'],
+        id: 'usr_admin',
+        name: 'Hazrat Admin (JIM Punjab)',
+        role: 'admin',
+      },
+      {
+        email: 'admin@markazroohulislam.com',
+        passwords: ['markaz@2026', 'markaz2026'],
+        id: 'usr_admin_mri',
+        name: 'Institutional Administrator',
+        role: 'admin',
+      },
+      {
+        email: 'accounts@markaz.com',
+        passwords: ['shariah@2026', 'shariah2026'],
+        id: 'usr_accountant',
+        name: 'Chief Accountant Office',
+        role: 'accountant',
+      },
+    ];
 
-    if (
-      email === 'admin@markaz.com' &&
-      (password === 'Markaz@2026' || password === 'markaz2026')
-    ) {
+    const matchedAccount = institutionalAccounts.find(
+      (acc) =>
+        acc.email === email &&
+        acc.passwords.some((p) => p.toLowerCase() === password.toLowerCase())
+    );
+
+    if (matchedAccount) {
       return NextResponse.json({
         success: true,
         user: {
-          id: 'usr_admin',
-          name: 'Admin (JIM Punjab)',
-          email: 'admin@markaz.com',
-          role: 'admin',
+          id: matchedAccount.id,
+          name: matchedAccount.name,
+          email: matchedAccount.email,
+          role: matchedAccount.role,
         },
       });
     }

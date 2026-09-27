@@ -77,6 +77,52 @@ const PUNJAB_CITIES_PRESET = [
   'Hafizabad', 'Sadiqabad', 'Burewala', 'Khanewal', 'Muzaffargarh'
 ];
 
+export const parseMoneyInput = (val: any): number => {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const cleaned = String(val).replace(/,/g, '').replace(/[^\d.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// 27 Complete Accounting Columns (A-AA) matching exact requested format
+export const ACCOUNTING_COLUMNS: { 
+  letter: string; 
+  key: AccountingColKey; 
+  titleEn: string; 
+  titleUr: string; 
+  width: string; 
+  align?: 'left' | 'center' | 'right' 
+}[] = [
+  { letter: 'A', key: 'donorName', titleEn: 'Name', titleUr: 'نام دہندہ / ممبر', width: 'w-48' },
+  { letter: 'B', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
+  { letter: 'C', key: 'zila', titleEn: 'Zila', titleUr: 'ضلع', width: 'w-28' },
+  { letter: 'D', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
+  { letter: 'E', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24', align: 'center' },
+  { letter: 'F', key: 'sarparastAla', titleEn: 'Sarparast-e-Ala', titleUr: 'سرپرست اعلیٰ', width: 'w-36' },
+  { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
+  { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
+  { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
+  { letter: 'J', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
+  { letter: 'K', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
+  { letter: 'L', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
+  { letter: 'M', key: 'apr', titleEn: 'Apr', titleUr: 'اپریل', width: 'w-20', align: 'right' },
+  { letter: 'N', key: 'may', titleEn: 'May', titleUr: 'مئی', width: 'w-20', align: 'right' },
+  { letter: 'O', key: 'jun', titleEn: 'Jun', titleUr: 'جون', width: 'w-20', align: 'right' },
+  { letter: 'P', key: 'jul', titleEn: 'Jul', titleUr: 'جولائی', width: 'w-20', align: 'right' },
+  { letter: 'Q', key: 'aug', titleEn: 'Aug', titleUr: 'اگست', width: 'w-20', align: 'right' },
+  { letter: 'R', key: 'sep', titleEn: 'Sep', titleUr: 'ستمبر', width: 'w-20', align: 'right' },
+  { letter: 'S', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
+  { letter: 'T', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
+  { letter: 'U', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
+  { letter: 'V', key: 'amount', titleEn: 'Money Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
+  { letter: 'W', key: 'targetAmount', titleEn: 'Target Money', titleUr: 'معینہ ہدف', width: 'w-28', align: 'right' },
+  { letter: 'X', key: 'balance', titleEn: 'Total Remaining', titleUr: 'بقایا واجب الادا', width: 'w-28', align: 'right' },
+  { letter: 'Y', key: 'paymentMode', titleEn: 'Mode', titleUr: 'طریقہ', width: 'w-24', align: 'center' },
+  { letter: 'Z', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
+  { letter: 'AA', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
+];
+
 export interface FinancialSheetsProps {
   isStandaloneShareView?: boolean;
 }
@@ -376,35 +422,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 27 Complete Accounting Columns (A-AA) matching exact requested format
-  const columns: { letter: string; key: AccountingColKey; titleEn: string; titleUr: string; width: string; align?: 'left' | 'center' | 'right' }[] = [
-    { letter: 'A', key: 'donorName', titleEn: 'Name', titleUr: 'نام دہندہ / ممبر', width: 'w-48' },
-    { letter: 'B', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
-    { letter: 'C', key: 'zila', titleEn: 'Zila', titleUr: 'ضلع', width: 'w-28' },
-    { letter: 'D', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
-    { letter: 'E', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24', align: 'center' },
-    { letter: 'F', key: 'sarparastAla', titleEn: 'Sarparast-e-Ala', titleUr: 'سرپرست اعلیٰ', width: 'w-36' },
-    { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
-    { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
-    { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
-    { letter: 'J', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
-    { letter: 'K', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
-    { letter: 'L', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
-    { letter: 'M', key: 'apr', titleEn: 'Apr', titleUr: 'اپریل', width: 'w-20', align: 'right' },
-    { letter: 'N', key: 'may', titleEn: 'May', titleUr: 'مئی', width: 'w-20', align: 'right' },
-    { letter: 'O', key: 'jun', titleEn: 'Jun', titleUr: 'جون', width: 'w-20', align: 'right' },
-    { letter: 'P', key: 'jul', titleEn: 'Jul', titleUr: 'جولائی', width: 'w-20', align: 'right' },
-    { letter: 'Q', key: 'aug', titleEn: 'Aug', titleUr: 'اگست', width: 'w-20', align: 'right' },
-    { letter: 'R', key: 'sep', titleEn: 'Sep', titleUr: 'ستمبر', width: 'w-20', align: 'right' },
-    { letter: 'S', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
-    { letter: 'T', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
-    { letter: 'U', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
-    { letter: 'V', key: 'amount', titleEn: 'Money Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
-    { letter: 'W', key: 'targetAmount', titleEn: 'Target Money', titleUr: 'معینہ ہدف', width: 'w-28', align: 'right' },
-    { letter: 'X', key: 'balance', titleEn: 'Total Remaining', titleUr: 'بقایا واجب الادا', width: 'w-28', align: 'right' },
-    { letter: 'Y', key: 'paymentMode', titleEn: 'Mode', titleUr: 'طریقہ', width: 'w-24', align: 'center' },
-    { letter: 'Z', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
-    { letter: 'AA', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
-  ];
+  const columns = ACCOUNTING_COLUMNS;
 
   // Helper to extract or compute cell values
   const getCellValue = (tx: Transaction, colKey: AccountingColKey): any => {
@@ -656,7 +674,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const handleCommitEdit = (rowId: string, colKey: AccountingColKey, value: string) => {
     if (MONTH_KEYS.includes(colKey as any)) {
       const mKey = colKey as MonthKey;
-      const numVal = parseFloat(value) || 0;
+      const numVal = parseMoneyInput(value);
       const tx = transactions.find(t => t.id === rowId);
       const currentMonths = tx?.monthsData || {};
       const updatedMonths = { ...currentMonths, [mKey]: numVal };
@@ -672,13 +690,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
     let finalVal: any = value;
     if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount', 'targetAmount'].includes(colKey as string)) {
-      finalVal = parseFloat(value) || 0;
+      finalVal = parseMoneyInput(value);
     }
 
     updateCell(rowId, colKey as keyof Transaction, finalVal);
 
     if (colKey === 'monthlyAmount') {
-      const num = parseFloat(value) || 0;
+      const num = parseMoneyInput(value);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         monthlyAmount: num,
@@ -687,7 +705,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Monthly',
       });
     } else if (colKey === 'quarterlyAmount') {
-      const num = parseFloat(value) || 0;
+      const num = parseMoneyInput(value);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         quarterlyAmount: num,
@@ -696,7 +714,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Quarterly',
       });
     } else if (colKey === 'annuallyAmount') {
-      const num = parseFloat(value) || 0;
+      const num = parseMoneyInput(value);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         annuallyAmount: num,
@@ -706,7 +724,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Annually',
       });
     } else if (colKey === 'targetAmount') {
-      const num = parseFloat(value) || 0;
+      const num = parseMoneyInput(value);
       updateTransaction(rowId, {
         targetAmount: num,
         annuallyAmount: num,
@@ -810,6 +828,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           });
           setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
           scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+        } else if (currentIdx > 0) {
+          const nextCol = columns[columns.length - 1];
+          const prevTx = displayedTransactions[currentIdx - 1];
+          setSelectedCell({
+            rowId: prevTx.id,
+            rowIndex: startIndex + currentIdx - 1,
+            colKey: nextCol.key,
+            colLetter: nextCol.letter
+          });
+          setFormulaBarValue(String(getCellValue(prevTx, nextCol.key)));
+          scrollToCell(`cell-${prevTx.id}-${nextCol.key}`);
         }
       } else {
         if (colIdx + 1 < columns.length) {
@@ -823,6 +852,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           });
           setFormulaBarValue(String(getCellValue(curTx, nextCol.key)));
           scrollToCell(`cell-${curTx.id}-${nextCol.key}`);
+        } else if (currentIdx + 1 < displayedTransactions.length) {
+          const nextCol = columns[0];
+          const nextTx = displayedTransactions[currentIdx + 1];
+          setSelectedCell({
+            rowId: nextTx.id,
+            rowIndex: startIndex + currentIdx + 1,
+            colKey: nextCol.key,
+            colLetter: nextCol.letter
+          });
+          setFormulaBarValue(String(getCellValue(nextTx, nextCol.key)));
+          scrollToCell(`cell-${nextTx.id}-${nextCol.key}`);
         }
       }
     } else if (e.key === 'ArrowUp') {
@@ -1718,16 +1758,15 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             <input
               type="text"
               value={formulaBarValue}
-              onChange={(e) => {
-                const val = e.target.value;
-                setFormulaBarValue(val);
+              onChange={(e) => setFormulaBarValue(e.target.value)}
+              onBlur={() => {
                 if (isRawMode && selectedRawCell) {
-                  handleRawCellChange(selectedRawCell.row, selectedRawCell.col, val);
+                  handleRawCellChange(selectedRawCell.row, selectedRawCell.col, formulaBarValue);
                 } else if (!isRawMode && selectedCell) {
-                  handleCommitEdit(selectedCell.rowId, selectedCell.colKey, val);
+                  handleCommitEdit(selectedCell.rowId, selectedCell.colKey, formulaBarValue);
                 }
               }}
-              placeholder={isRawMode ? "Type text, numbers, or formula (=SUM(A1:A10)) into active cell..." : "Type text or value into active cell (live update)..."}
+              placeholder={isRawMode ? "Type text, numbers, or formula (=SUM(A1:A10)) into active cell..." : "Type text or value and press Enter to commit..."}
               className="w-full py-1 px-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-mono"
             />
           </form>

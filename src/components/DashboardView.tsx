@@ -83,11 +83,12 @@ export const DashboardView: React.FC = () => {
     }
   }, [isCreateProjectModalOpen]);
 
-  // Handle direct navigation to dynamic sheet route
+  // Handle direct navigation to dynamic sheet route (SPA transition)
   const handleOpenSheet = (tabId: string) => {
     setActiveSheetTabId(tabId);
+    setActiveTab('sheets');
     if (typeof window !== 'undefined') {
-      window.location.href = `/dashboard/sheets/${tabId}`;
+      window.history.pushState({}, '', `/dashboard/sheets/${tabId}`);
     }
   };
 
@@ -445,10 +446,11 @@ export const DashboardView: React.FC = () => {
 
             <button
               onClick={() => {
+                const targetSheet = activeSheetTabId || (sheetTabs[0]?.id ?? 'sheet-00-sarparast-e-aala');
+                setActiveSheetTabId(targetSheet);
+                setActiveTab('sheets');
                 if (typeof window !== 'undefined') {
-                  window.location.href = `/dashboard/sheets/${activeSheetTabId || (sheetTabs[0]?.id ?? 'sheet-00-sarparast-e-aala')}`;
-                } else {
-                  setActiveTab('sheets');
+                  window.history.pushState({}, '', `/dashboard/sheets/${targetSheet}`);
                 }
               }}
               className="px-4 py-2.5 rounded-xl bg-[#fdfaf3] hover:bg-amber-50 text-emerald-950 font-bold text-xs flex items-center gap-1.5 border border-amber-300/80 cursor-pointer transition-colors shadow-2xs"
