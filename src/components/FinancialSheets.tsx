@@ -2683,219 +2683,18 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             </table>
           </div>
 
-          {/* GOOGLE SHEETS CLONE STYLE BOTTOM ROW CONTROLS (Template Mode) */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
-            
-            {/* Left: Add rows input + presets (Google Sheet Clone Pattern) */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-slate-600 dark:text-slate-300 font-bold">Add rows at bottom:</span>
-              <div className="flex items-center border border-slate-300 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-2xs">
-                <input
-                  type="number"
-                  min="1"
-                  max="2000"
-                  value={templateAddCount}
-                  onChange={(e) => setTemplateAddCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="w-16 p-1.5 text-center font-bold text-slate-900 dark:text-white bg-transparent border-0 focus:outline-none"
-                />
-                <button
-                  onClick={() => addBlankRow(templateAddCount)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Rows</span>
-                </button>
-              </div>
-
-              {/* Quick presets */}
-              <div className="flex items-center gap-1">
-                {[10, 25, 50, 100, 200, 500].map(cnt => (
-                  <button
-                    key={cnt}
-                    onClick={() => addBlankRow(cnt)}
-                    className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 font-bold hover:border-emerald-500 hover:text-emerald-600 transition-colors"
-                    title={`Add ${cnt} rows`}
-                  >
-                    +{cnt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Right: Limit Selector & Pagination Controls */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500 dark:text-slate-400 font-medium">Rows per page:</span>
-                <select
-                  value={rowLimit}
-                  onChange={(e) => {
-                    setRowLimit(e.target.value as any);
-                    setCurrentPage(1);
-                  }}
-                  className="py-1 px-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold focus:outline-none"
-                >
-                  <option value="25">25 rows</option>
-                  <option value="50">50 rows</option>
-                  <option value="100">100 rows</option>
-                  <option value="250">250 rows</option>
-                  <option value="500">500 rows</option>
-                  <option value="all">All rows ({totalTemplateRows})</option>
-                </select>
-              </div>
-
-              <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-                Showing {totalTemplateRows === 0 ? 0 : startIndex + 1}–{endIndex} of {totalTemplateRows} records
-              </span>
-
-              {rowLimit !== 'all' && totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={safePage <= 1}
-                    className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
-                  >
-                    ◀ Prev
-                  </button>
-                  <span className="px-2 font-bold text-slate-700 dark:text-slate-200">
-                    Page {safePage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={safePage >= totalPages}
-                    className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-bold"
-                  >
-                    Next ▶
-                  </button>
-                </div>
-              )}
-            </div>
-
           </div>
-
-        </div>
         )}
-
-        {/* GOOGLE SHEETS MULTI-SHEET TABS BAR (BOTTOM) */}
-        <div className="flex flex-wrap items-center justify-between p-2 bg-slate-100 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-800 gap-2">
-          
-          {/* Sheet Tabs List - Dynamic single Sheet 1 by default, or loaded template tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto">
-            
-            {/* Add New Sheet Tab Button */}
-            <button
-              onClick={() => createTemplateSheet()}
-              className="p-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-xs flex items-center gap-1 text-xs font-bold"
-              title="Add New Sheet"
-            >
-              <Plus className="w-4 h-4 text-emerald-600" />
-              <span className="hidden sm:inline text-[11px]">Sheet {sheetTabs.length + 1}</span>
-            </button>
-
-            {sheetTabs.map((tab, idx) => {
-              const isActive = activeSheetTabId === tab.id;
-              const sheetNum = idx + 1;
-              return (
-                <div
-                  key={tab.id}
-                  onClick={() => setActiveSheetTabId(tab.id)}
-                  className={`group flex items-center gap-2 px-4 py-2 rounded-t-lg text-xs font-bold cursor-pointer transition-all border-t-2 ${
-                    isActive
-                      ? 'bg-white dark:bg-slate-950 text-slate-900 dark:text-white border-blue-600 shadow-sm'
-                      : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-200'
-                  }`}
-                >
-                  <FileSpreadsheet className={`w-3.5 h-3.5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                  <span>{tab.name || `Sheet ${sheetNum}`}</span>
-                  {tab.cityName && !tab.name.toLowerCase().includes(tab.cityName.toLowerCase()) && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold">
-                      📍 {tab.cityName}
-                    </span>
-                  )}
-                  {tab.periodType === 'raw' && (
-                    <span className="text-[9px] px-1 rounded bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300">A-Z</span>
-                  )}
-                  {sheetTabs.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Are you sure you want to delete sheet "${tab.name}"?`)) {
-                          deleteSheetTab(tab.id);
-                        }
-                      }}
-                      className="opacity-40 group-hover:opacity-100 hover:text-rose-600 text-slate-400 p-0.5 ml-1 transition-opacity cursor-pointer"
-                      title="Delete Sheet"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-
-          </div>
-
-          {/* Quick Row Count & Status Indicator in Tabs Bar */}
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 px-2">
-            <span>
-              {isRawMode 
-                ? `${displayedRawRowCount}/${rawRowCount} rows`
-                : `${totalTemplateRows} records`}
-            </span>
-          </div>
-
-        </div>
 
       </div>
 
-      {/* GOOGLE SHEETS BOTTOM QUICK FORMULA & STATS WIDGET (Template Mode) */}
-      {!isRawMode && (
-        <div className="bg-slate-900 text-white rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono shadow-md">
-          
-          <div className="flex flex-wrap items-center gap-4 text-slate-300">
-            <div className="flex items-center gap-1.5">
-              <span className="text-emerald-400 font-bold">●</span>
-              <span className="font-sans font-bold text-slate-200">COUNT: </span>
-              <span className="text-white font-bold">{summaryStats.count}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-emerald-400 font-bold">●</span>
-              <span className="font-sans font-bold text-slate-200">SUM: </span>
-              <span className="text-emerald-400 font-bold">{orgConfig.currencySymbol} {summaryStats.sum.toLocaleString()}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-rose-400 font-bold">●</span>
-              <span className="font-sans font-bold text-slate-200">EXPENSES: </span>
-              <span className="text-rose-400 font-bold">{orgConfig.currencySymbol} {summaryStats.totalExp.toLocaleString()}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-amber-400 font-bold">●</span>
-              <span className="font-sans font-bold text-slate-200">AVG: </span>
-              <span className="text-white">{orgConfig.currencySymbol} {Math.round(summaryStats.avg).toLocaleString()}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-amber-300 font-bold font-sans">
-              NET BALANCE: 
-            </span>
-            <span className="text-base font-black text-amber-400">
-              {orgConfig.currencySymbol} {summaryStats.net.toLocaleString()}
-            </span>
-          </div>
-
-        </div>
-      )}
-
-      {/* AUTHENTIC GOOGLE SHEETS / EXCEL STYLE FIXED BOTTOM BAR */}
-      <div className="sticky bottom-0 z-30 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-3 py-1.5 flex items-center justify-between shadow-md">
+      {/* AUTHENTIC EXCEL / GOOGLE SHEETS STYLE FIXED BOTTOM TAB & STATUS BAR */}
+      <div className="sticky bottom-0 z-30 bg-slate-100 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-800 px-3 py-1.5 flex items-center justify-between shadow-md gap-3">
         {/* Left: + Add Sheet button & Sheet Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5 scrollbar-thin">
           <button
             onClick={() => createTemplateSheet()}
-            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer"
+            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
             title="Add New Sheet Tab"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
@@ -2908,7 +2707,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             const sheetNumber = index + 1;
             const isSelected = activeSheetTabId === sheet.id;
             return (
-              <button
+              <div
                 key={sheet.id}
                 onClick={() => {
                   setActiveSheetTabId(sheet.id);
@@ -2918,29 +2717,60 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     window.history.pushState({}, '', newPath);
                   }
                 }}
-                className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 border cursor-pointer ${
+                className={`group px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center gap-2 border cursor-pointer whitespace-nowrap ${
                   isSelected
                     ? 'bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 border-emerald-500 shadow-2xs'
                     : 'bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border-transparent'
                 }`}
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>{sheet.name || `Sheet ${sheetNumber}`}</span>
-                {sheet.cityName && (
-                  <span className="text-[9px] px-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold">
+                <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">{sheet.name || `Sheet ${sheetNumber}`}</span>
+                {sheet.cityName && !sheet.name?.toLowerCase().includes(sheet.cityName.toLowerCase()) && (
+                  <span className="text-[9px] px-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold whitespace-nowrap">
                     📍 {sheet.cityName}
                   </span>
                 )}
-              </button>
+                {sheetTabs.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Are you sure you want to delete sheet "${sheet.name || `Sheet ${sheetNumber}`}"?`)) {
+                        deleteSheetTab(sheet.id);
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 hover:text-rose-600 text-slate-400 p-0.5 ml-0.5 rounded transition-opacity cursor-pointer shrink-0"
+                    title="Delete Sheet"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* Right: Status indicator */}
-        <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0 pl-2">
+        {/* Right: Clean Status Bar Metrics */}
+        <div className="hidden lg:flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 font-mono shrink-0 pl-2">
+          {!isRawMode && (
+            <>
+              <span className="flex items-center gap-1 font-sans font-semibold">
+                <span className="text-slate-400">Records:</span>
+                <span className="text-slate-900 dark:text-white font-bold">{summaryStats.count}</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 font-sans font-semibold">
+                <span className="text-slate-400">Collected:</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{orgConfig.currencySymbol} {summaryStats.totalPaid.toLocaleString()}</span>
+              </span>
+              <span>•</span>
+            </>
+          )}
           <span>{sheetTabs.length} sheets active</span>
           <span>•</span>
-          <span>Database synced</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Cloud Synced
+          </span>
         </div>
       </div>
 
