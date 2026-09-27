@@ -66,6 +66,7 @@ export interface Transaction {
   branchName?: string; // برانچ کا نام / شاخ
   zila?: string; // ضلع / District
   phone: string; // فون نمبر
+  sarparastAla?: string; // سرپرست اعلیٰ
   address: string; // مکمل پتہ
   city?: string; // شہر
   reference?: string; // بتوسط (legacy/optional)
@@ -74,6 +75,7 @@ export interface Transaction {
   quarterlyAmount?: number; // سہ ماہی رقم
   halfYearlyAmount?: number; // شش ماہی رقم
   annuallyAmount?: number; // سالانہ رقم
+  targetAmount?: number; // معینہ ہدف (Target Money)
   monthsData?: MonthlyContributions; // 12-Month Contribution breakdown
   amount: number; // کل وصول شدہ رقم (Total Paid / Collected Amount)
   amountInWordsUrdu?: string;

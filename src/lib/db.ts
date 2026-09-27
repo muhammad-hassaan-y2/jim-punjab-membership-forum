@@ -48,6 +48,8 @@ export async function initDatabase() {
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS quarterly_amount NUMERIC(15, 2) DEFAULT 0`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS annually_amount NUMERIC(15, 2) DEFAULT 0`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS months_data JSONB DEFAULT '{}'`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS sarparast_ala VARCHAR(255)`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS target_amount NUMERIC(15, 2) DEFAULT 0`;
 
     // 2. Sheet Tabs table
     await sql`

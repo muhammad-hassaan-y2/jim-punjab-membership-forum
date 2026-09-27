@@ -548,7 +548,7 @@ export const DashboardView: React.FC = () => {
                   Showing {filteredSheets.length} of {sheetTabs.length} Working Sheets
                 </span>
                 <span className="text-[11px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                  ✓ Standard 26-Column Shariah Accounting Format (A-Z)
+                  ✓ Standard 27-Column Shariah Accounting Format (A-AA)
                 </span>
               </div>
 
@@ -631,7 +631,7 @@ export const DashboardView: React.FC = () => {
                                 <span>ضلع / City: {sheet.cityName || sheet.name}</span>
                               </span>
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
-                                26 Cols (A-Z)
+                                27 Cols (A-AA)
                               </span>
                             </div>
                           </>

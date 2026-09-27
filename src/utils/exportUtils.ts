@@ -13,11 +13,13 @@ export function exportTransactionsToExcel(
 ) {
   const rows = transactions.map((t, index) => {
     const months = t.monthsData || {};
-    const target = t.annuallyAmount && t.annuallyAmount > 0 
-      ? t.annuallyAmount 
-      : (t.quarterlyAmount && t.quarterlyAmount > 0 
-          ? t.quarterlyAmount * 4 
-          : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
+    const target = (t.targetAmount !== undefined && t.targetAmount > 0)
+      ? t.targetAmount
+      : (t.annuallyAmount && t.annuallyAmount > 0 
+          ? t.annuallyAmount 
+          : (t.quarterlyAmount && t.quarterlyAmount > 0 
+              ? t.quarterlyAmount * 4 
+              : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount)));
     const paid = Object.values(months).length > 0 
       ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
       : Number(t.amount || 0);
@@ -25,12 +27,12 @@ export function exportTransactionsToExcel(
 
     return {
       'Sr #': index + 1,
-      'Receipt No / رسید نمبر': t.receiptNo,
-      'Date / تاریخ': t.date,
       'Donor Name / نام دہندہ': t.donorName || t.donorNameUrdu || '',
       'Branch Name / برانچ': t.branchName || '',
       'Zila / ضلع': t.zila || t.city || '',
       'Phone / فون نمبر': t.phone || '',
+      'Receipt No / رسید نمبر': t.receiptNo,
+      'Sarparast-e-Ala / سرپرست اعلیٰ': t.sarparastAla || '',
       'Monthly / ماہانہ رقم': t.monthlyAmount || 0,
       'Quarterly / سہ ماہی رقم': t.quarterlyAmount || 0,
       'Annually / سالانہ رقم': t.annuallyAmount || 0,
@@ -46,11 +48,12 @@ export function exportTransactionsToExcel(
       'Oct / اکتوبر': months.oct || 0,
       'Nov / نومبر': months.nov || 0,
       'Dec / دسمبر': months.dec || 0,
-      'Total Paid / کل وصولی': paid,
-      'Balance Due / واجب الادا': balance,
+      'Money Paid / کل وصولی': paid,
+      'Target Money / معینہ ہدف': target,
+      'Total Remaining / واجب الادا': balance,
       'Payment Mode / طریقہ': t.paymentMode || 'Cash',
       'Bank Name / بینک': t.bankName || '',
-      'Notes / کیفیات': t.notes || '',
+      'Remarks / کیفیات': t.notes || '',
     };
   });
 

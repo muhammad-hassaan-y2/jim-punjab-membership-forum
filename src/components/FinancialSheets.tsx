@@ -43,17 +43,18 @@ import {
 import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey } from '../types/finance';
 
 export type AccountingColKey = 
-  | 'receiptNo' 
-  | 'date' 
   | 'donorName' 
   | 'branchName' 
   | 'zila' 
   | 'phone' 
+  | 'receiptNo' 
+  | 'sarparastAla' 
   | 'monthlyAmount' 
   | 'quarterlyAmount' 
   | 'annuallyAmount' 
   | 'jan' | 'feb' | 'mar' | 'apr' | 'may' | 'jun' | 'jul' | 'aug' | 'sep' | 'oct' | 'nov' | 'dec' 
   | 'amount' 
+  | 'targetAmount' 
   | 'balance' 
   | 'paymentMode' 
   | 'bankName' 
@@ -374,14 +375,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // File import ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 26 Complete Accounting Columns (A-Z) matching exact requested format
+  // 27 Complete Accounting Columns (A-AA) matching exact requested format
   const columns: { letter: string; key: AccountingColKey; titleEn: string; titleUr: string; width: string; align?: 'left' | 'center' | 'right' }[] = [
-    { letter: 'A', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24' },
-    { letter: 'B', key: 'date', titleEn: 'Date', titleUr: 'تاریخ', width: 'w-24', align: 'center' },
-    { letter: 'C', key: 'donorName', titleEn: 'Donor Name', titleUr: 'نام دہندہ', width: 'w-48' },
-    { letter: 'D', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
-    { letter: 'E', key: 'zila', titleEn: 'Zila / City', titleUr: 'ضلع / شہر', width: 'w-28' },
-    { letter: 'F', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
+    { letter: 'A', key: 'donorName', titleEn: 'Name', titleUr: 'نام دہندہ / ممبر', width: 'w-48' },
+    { letter: 'B', key: 'branchName', titleEn: 'Branch', titleUr: 'شاخ / برانچ', width: 'w-32' },
+    { letter: 'C', key: 'zila', titleEn: 'Zila', titleUr: 'ضلع', width: 'w-28' },
+    { letter: 'D', key: 'phone', titleEn: 'Phone', titleUr: 'فون نمبر', width: 'w-28' },
+    { letter: 'E', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24', align: 'center' },
+    { letter: 'F', key: 'sarparastAla', titleEn: 'Sarparast-e-Ala', titleUr: 'سرپرست اعلیٰ', width: 'w-36' },
     { letter: 'G', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
     { letter: 'H', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
     { letter: 'I', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
@@ -397,11 +398,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     { letter: 'S', key: 'oct', titleEn: 'Oct', titleUr: 'اکتوبر', width: 'w-20', align: 'right' },
     { letter: 'T', key: 'nov', titleEn: 'Nov', titleUr: 'نومبر', width: 'w-20', align: 'right' },
     { letter: 'U', key: 'dec', titleEn: 'Dec', titleUr: 'دسمبر', width: 'w-20', align: 'right' },
-    { letter: 'V', key: 'amount', titleEn: 'Total Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
-    { letter: 'W', key: 'balance', titleEn: 'Balance Due', titleUr: 'واجب الادا', width: 'w-28', align: 'right' },
-    { letter: 'X', key: 'paymentMode', titleEn: 'Payment Mode', titleUr: 'طریقہ', width: 'w-28', align: 'center' },
-    { letter: 'Y', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
-    { letter: 'Z', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
+    { letter: 'V', key: 'amount', titleEn: 'Money Paid', titleUr: 'کل وصولی', width: 'w-28', align: 'right' },
+    { letter: 'W', key: 'targetAmount', titleEn: 'Target Money', titleUr: 'معینہ ہدف', width: 'w-28', align: 'right' },
+    { letter: 'X', key: 'balance', titleEn: 'Total Remaining', titleUr: 'بقایا واجب الادا', width: 'w-28', align: 'right' },
+    { letter: 'Y', key: 'paymentMode', titleEn: 'Mode', titleUr: 'طریقہ', width: 'w-24', align: 'center' },
+    { letter: 'Z', key: 'bankName', titleEn: 'Bank Name', titleUr: 'بینک کا نام', width: 'w-32' },
+    { letter: 'AA', key: 'notes', titleEn: 'Remarks', titleUr: 'کیفیات', width: 'w-36' },
   ];
 
   // Helper to extract or compute cell values
@@ -409,18 +411,34 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     if (MONTH_KEYS.includes(colKey as any)) {
       return tx.monthsData?.[colKey as MonthKey] || 0;
     }
-    if (colKey === 'balance') {
-      const tgt = (tx.annuallyAmount && tx.annuallyAmount > 0)
+    if (colKey === 'amount') {
+      const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
+        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
+        : Number(tx.amount || 0);
+      return paid;
+    }
+    if (colKey === 'targetAmount') {
+      if (tx.targetAmount !== undefined && tx.targetAmount > 0) return tx.targetAmount;
+      return (tx.annuallyAmount && tx.annuallyAmount > 0)
         ? tx.annuallyAmount
         : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
             ? tx.quarterlyAmount * 4
-            : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount));
+            : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : (tx.amount || 0)));
+    }
+    if (colKey === 'balance') {
+      const tgt = (tx.targetAmount !== undefined && tx.targetAmount > 0)
+        ? tx.targetAmount
+        : ((tx.annuallyAmount && tx.annuallyAmount > 0)
+            ? tx.annuallyAmount
+            : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
+                ? tx.quarterlyAmount * 4
+                : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : (tx.amount || 0))));
       const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
         ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
         : Number(tx.amount || 0);
       return Math.max(0, (tgt || 0) - paid);
     }
-    return (tx as any)[colKey];
+    return (tx as any)[colKey] || '';
   };
 
   // Filtered & Sorted Transactions with Accounting Slicers
@@ -563,11 +581,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       quarterlyCommitmentsSum += Number(t.quarterlyAmount || 0);
       annuallyCommitmentsSum += Number(t.annuallyAmount || 0);
 
-      const target = (t.annuallyAmount && t.annuallyAmount > 0)
-        ? t.annuallyAmount
-        : ((t.quarterlyAmount && t.quarterlyAmount > 0)
-            ? t.quarterlyAmount * 4
-            : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount));
+      const target = (t.targetAmount !== undefined && t.targetAmount > 0)
+        ? t.targetAmount
+        : ((t.annuallyAmount && t.annuallyAmount > 0)
+            ? t.annuallyAmount
+            : ((t.quarterlyAmount && t.quarterlyAmount > 0)
+                ? t.quarterlyAmount * 4
+                : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount)));
       totalPledged += Number(target || 0);
 
       const months = t.monthsData || {};
@@ -651,7 +671,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     }
 
     let finalVal: any = value;
-    if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(colKey as string)) {
+    if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount', 'targetAmount'].includes(colKey as string)) {
       finalVal = parseFloat(value) || 0;
     }
 
@@ -680,9 +700,16 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         annuallyAmount: num,
+        targetAmount: num,
         monthlyAmount: tx?.monthlyAmount || (num > 0 ? Math.round(num / 12) : 0),
         quarterlyAmount: tx?.quarterlyAmount || (num > 0 ? Math.round(num / 4) : 0),
         preferredPeriod: 'Annually',
+      });
+    } else if (colKey === 'targetAmount') {
+      const num = parseFloat(value) || 0;
+      updateTransaction(rowId, {
+        targetAmount: num,
+        annuallyAmount: num,
       });
     }
 
@@ -722,10 +749,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       setSelectedCell({
         rowId: first.id,
         rowIndex: 0,
-        colKey: 'receiptNo',
+        colKey: 'donorName',
         colLetter: 'A'
       });
-      setFormulaBarValue(String(first.receiptNo || ''));
+      setFormulaBarValue(String(first.donorName || ''));
     }
   }, [isRawMode, displayedTransactions, selectedCell]);
 
@@ -1416,6 +1443,26 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               <span>Add Row</span>
             </button>
 
+            {/* Delete Selected Row — only visible when a row is selected */}
+            {selectedCell && !isRawMode && (
+              <button
+                onClick={() => {
+                  const tx = transactions.find(t => t.id === selectedCell.rowId);
+                  const label = tx?.donorName || tx?.receiptNo || 'this row';
+                  if (window.confirm(`Delete row "${label}"?`)) {
+                    deleteTransaction(selectedCell.rowId);
+                    setSelectedCell(null);
+                    setEditingCell(null);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 shadow-2xs hover:shadow active:scale-95 transition-all cursor-pointer"
+                title="Delete selected row"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete Row</span>
+              </button>
+            )}
+
             {/* AI Scan Document */}
             <button
               onClick={() => setIsGeminiScannerOpen(true)}
@@ -1924,57 +1971,57 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     #
                   </th>
 
-                  {/* Col A: Receipt No */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
-                      <span className="text-[9px] text-slate-400">رسید نمبر</span>
-                    </div>
-                  </th>
-
-                  {/* Col B: Date */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Date</span>
-                      <span className="text-[9px] text-slate-400">تاریخ</span>
-                    </div>
-                  </th>
-
-                  {/* Col C: Donor Name */}
+                  {/* Col A: Name */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Donor Name</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Name</span>
                       <span className="text-[9px] text-slate-400">نام دہندہ / ممبر</span>
                     </div>
                   </th>
 
-                  {/* Col D: Branch Name */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col B: Branch */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Branch</span>
                       <span className="text-[9px] text-slate-400">شاخ / برانچ</span>
                     </div>
                   </th>
 
-                  {/* Col E: Zila */}
+                  {/* Col C: Zila */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Zila</span>
                       <span className="text-[9px] text-slate-400">ضلع</span>
                     </div>
                   </th>
 
-                  {/* Col F: Phone */}
+                  {/* Col D: Phone */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">F</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Phone</span>
                       <span className="text-[9px] text-slate-400">فون نمبر</span>
+                    </div>
+                  </th>
+
+                  {/* Col E: Receipt No */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
+                      <span className="text-[9px] text-slate-400">رسید نمبر</span>
+                    </div>
+                  </th>
+
+                  {/* Col F: Sarparast-e-Ala */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">F</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Sarparast-e-Ala</span>
+                      <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">سرپرست اعلیٰ</span>
                     </div>
                   </th>
 
@@ -1994,54 +2041,58 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     </div>
                   </th>
 
-                  {/* Col V: Total Paid */}
+                  {/* Col V: Money Paid */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">V</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Paid</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Money Paid</span>
                       <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">کل وصولی</span>
                     </div>
                   </th>
 
-                  {/* Col W: Balance Due */}
+                  {/* Col W: Target Money */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">W</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Balance Due</span>
-                      <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">واجب الادا</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Target Money</span>
+                      <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold">معینہ ہدف</span>
                     </div>
                   </th>
 
-                  {/* Col X: Payment Mode */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col X: Total Remaining */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">X</span>
-                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mode</span>
-                      <span className="text-[9px] text-slate-400">ادائیگی</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Remaining</span>
+                      <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">بقایا واجب الادا</span>
                     </div>
                   </th>
 
-                  {/* Col Y: Bank Name */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col Y: Mode */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Y</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mode</span>
+                      <span className="text-[9px] text-slate-400">طریقہ</span>
+                    </div>
+                  </th>
+
+                  {/* Col Z: Bank Name */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Z</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Bank Name</span>
                       <span className="text-[9px] text-slate-400">بینک کا نام</span>
                     </div>
                   </th>
 
-                  {/* Col Z: Remarks */}
+                  {/* Col AA: Remarks */}
                   <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Z</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">AA</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Remarks</span>
                       <span className="text-[9px] text-slate-400">کیفیات</span>
                     </div>
-                  </th>
-
-                  {/* Actions Header */}
-                  <th rowSpan={2} className="w-28 p-2 text-center font-bold text-slate-700 dark:text-slate-200 text-xs border-b border-slate-300 dark:border-slate-700 align-middle">
-                    Actions
                   </th>
                 </tr>
 
@@ -2141,11 +2192,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     const isRowSelected = selectedCell?.rowId === tx.id;
 
                     // Computed Target, Paid, and Balance for this row
-                    const annualTarget = (tx.annuallyAmount && tx.annuallyAmount > 0)
-                      ? tx.annuallyAmount
-                      : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
-                          ? tx.quarterlyAmount * 4
-                          : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount));
+                    const annualTarget = (tx.targetAmount !== undefined && tx.targetAmount > 0)
+                      ? tx.targetAmount
+                      : ((tx.annuallyAmount && tx.annuallyAmount > 0)
+                          ? tx.annuallyAmount
+                          : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
+                              ? tx.quarterlyAmount * 4
+                              : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount)));
                     
                     const months = tx.monthsData || {};
                     const totalRowPaid = Object.values(months).length > 0
@@ -2171,10 +2224,120 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           {rowIndex + 1}
                         </td>
 
-                        {/* Column A: Receipt No */}
+                        {/* Column A: Donor Name */}
+                        <td 
+                          id={`cell-${tx.id}-donorName`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'A')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'donorName' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'donorName', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'donorName', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="font-semibold text-slate-800 dark:text-slate-100">
+                              {tx.donorName || tx.donorNameUrdu || '---'}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column B: Branch Name */}
+                        <td 
+                          id={`cell-${tx.id}-branchName`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'branchName', 'B')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'branchName')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'branchName' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'branchName', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'branchName', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="text-slate-600 dark:text-slate-300 truncate block">{tx.branchName || '---'}</span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column C: Zila */}
+                        <td 
+                          id={`cell-${tx.id}-zila`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'zila', 'C')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'zila')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'zila' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'zila', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'zila', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
+                            />
+                          ) : (
+                            <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.zila || tx.city || '---'}</span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column D: Phone */}
+                        <td 
+                          id={`cell-${tx.id}-phone`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'D')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'phone')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono cursor-cell relative select-none ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'phone' ? (
+                            <input
+                              type="tel"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'phone', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'phone', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs font-mono"
+                            />
+                          ) : (
+                            tx.phone || '---'
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column E: Receipt No */}
                         <td 
                           id={`cell-${tx.id}-receiptNo`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'receiptNo', 'A')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'receiptNo', 'E')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'receiptNo')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono font-bold text-blue-600 dark:text-blue-400 cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'receiptNo' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2207,139 +2370,31 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column B: Date */}
+                        {/* Column F: Sarparast-e-Ala */}
                         <td 
-                          id={`cell-${tx.id}-date`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'date', 'B')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'date')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono text-center cursor-cell relative select-none ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'date' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'date' ? (
-                            <input
-                              type="date"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'date', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'date', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                            />
-                          ) : (
-                            tx.date
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'date' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                          )}
-                        </td>
-
-                        {/* Column C: Donor Name */}
-                        <td 
-                          id={`cell-${tx.id}-donorName`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'C')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
+                          id={`cell-${tx.id}-sarparastAla`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'sarparastAla', 'F')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'sarparastAla')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'sarparastAla' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
                         >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'donorName' ? (
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'sarparastAla' ? (
                             <input
                               type="text"
                               autoFocus
                               value={cellEditValue}
                               onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'donorName', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'donorName', idx, cellEditValue)}
+                              onBlur={() => handleCommitEdit(tx.id, 'sarparastAla', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'sarparastAla', idx, cellEditValue)}
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className="font-semibold text-slate-800 dark:text-slate-100">
-                              {tx.donorName || tx.donorNameUrdu || '---'}
+                            <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+                              {tx.sarparastAla || '---'}
                             </span>
                           )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                          )}
-                        </td>
-
-                        {/* Column D: Branch Name */}
-                        <td 
-                          id={`cell-${tx.id}-branchName`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'branchName', 'D')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'branchName')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'branchName' ? (
-                            <input
-                              type="text"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'branchName', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'branchName', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                            />
-                          ) : (
-                            <span className="text-slate-600 dark:text-slate-300 truncate block">{tx.branchName || '---'}</span>
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                          )}
-                        </td>
-
-                        {/* Column E: Zila / District */}
-                        <td 
-                          id={`cell-${tx.id}-zila`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'zila', 'E')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'zila')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'zila' ? (
-                            <input
-                              type="text"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'zila', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'zila', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
-                            />
-                          ) : (
-                            <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.zila || tx.city || '---'}</span>
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                          )}
-                        </td>
-
-                        {/* Column F: Phone */}
-                        <td 
-                          id={`cell-${tx.id}-phone`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'phone', 'F')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'phone')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 font-mono cursor-cell relative select-none ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'phone' ? (
-                            <input
-                              type="tel"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'phone', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'phone', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs font-mono"
-                            />
-                          ) : (
-                            tx.phone || '---'
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' && !editingCell && (
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'sarparastAla' && !editingCell && (
                             <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
                           )}
                         </td>
@@ -2473,7 +2528,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           );
                         })}
 
-                        {/* Column V: Total Paid (Calculated) */}
+                        {/* Column V: Money Paid (Calculated) */}
                         <td 
                           id={`cell-${tx.id}-amount`}
                           onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'V')}
@@ -2489,10 +2544,39 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column W: Balance Due (Calculated) */}
+                        {/* Column W: Target Money */}
+                        <td 
+                          id={`cell-${tx.id}-targetAmount`}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'targetAmount', 'W')}
+                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'targetAmount')}
+                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
+                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'targetAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+                          }`}
+                        >
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'targetAmount' ? (
+                            <input
+                              type="number"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'targetAmount', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'targetAmount', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                            />
+                          ) : (
+                            <span className="font-bold text-blue-700 dark:text-blue-300">
+                              ₨ {Number(annualTarget).toLocaleString()}
+                            </span>
+                          )}
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'targetAmount' && !editingCell && (
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                          )}
+                        </td>
+
+                        {/* Column X: Total Remaining (Balance Due) */}
                         <td 
                           id={`cell-${tx.id}-balance`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'W')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'X')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
@@ -2511,10 +2595,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column X: Payment Mode */}
+                        {/* Column Y: Mode */}
                         <td 
                           id={`cell-${tx.id}-paymentMode`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'X')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'paymentMode', 'Y')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-center relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
@@ -2534,10 +2618,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column Y: Bank Name */}
+                        {/* Column Z: Bank Name */}
                         <td 
                           id={`cell-${tx.id}-bankName`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'Y')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'bankName', 'Z')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'bankName')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2561,10 +2645,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column Z: Remarks / Notes */}
+                        {/* Column AA: Remarks */}
                         <td 
                           id={`cell-${tx.id}-notes`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'Z')}
+                          onClick={() => handleCellClick(tx.id, rowIndex, 'notes', 'AA')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'notes')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
@@ -2586,42 +2670,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' && !editingCell && (
                             <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
                           )}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="p-2 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1">
-                            {/* Quick Pay Current Month */}
-                            <button
-                              onClick={() => handleQuickPayMonth(tx, focusedMonth || undefined)}
-                              className="p-1 px-1.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-0.5 shadow-2xs border border-emerald-300 dark:border-emerald-800"
-                              title={`Record pledge for ${focusedMonth ? MONTH_LABELS[focusedMonth].en : 'active month'}`}
-                            >
-                              <Plus className="w-2.5 h-2.5" />
-                              <span>Pay</span>
-                            </button>
-                            <button
-                              onClick={() => handleOpenVoucher(tx)}
-                              className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                              title="Print / View Voucher"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => duplicateTransaction(tx.id)}
-                              className="p-1 rounded hover:bg-emerald-100 text-emerald-600"
-                              title="Duplicate Row"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => deleteTransaction(tx.id)}
-                              className="p-1 rounded hover:bg-rose-100 text-rose-600"
-                              title="Delete Row"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
                         </td>
 
                       </tr>
@@ -2657,24 +2705,28 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                       {summaryStats.monthSums[mKey] > 0 ? `₨ ${(summaryStats.monthSums[mKey] / 1000).toFixed(summaryStats.monthSums[mKey] >= 10000 ? 0 : 1)}k` : '—'}
                     </td>
                   ))}
-                  {/* Col V: Total Collected */}
+                  {/* Col V: Total Collected (Money Paid) */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-emerald-300 font-black">
                     ₨ {summaryStats.totalPaid.toLocaleString()}
                   </td>
-                  {/* Col W: Total Balance Due */}
+                  {/* Col W: Target Money Total */}
+                  <td className="p-2.5 text-right border-r border-slate-800 text-blue-300 font-black">
+                    ₨ {summaryStats.totalPledged.toLocaleString()}
+                  </td>
+                  {/* Col X: Total Remaining */}
                   <td className="p-2.5 text-right border-r border-slate-800 text-amber-300 font-black">
                     ₨ {summaryStats.totalBalance.toLocaleString()}
                   </td>
-                  {/* Col X: Payment Mode Summary */}
+                  {/* Col Y: Payment Mode Summary */}
                   <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
                     Cash: {Math.round((summaryStats.cashTotal / (summaryStats.totalPaid || 1)) * 100)}%
                   </td>
-                  {/* Col Y: Bank Summary */}
+                  {/* Col Z: Bank Summary */}
                   <td className="p-2 text-center border-r border-slate-800 text-[10px] text-slate-400 font-sans">
                     Bank: {Math.round((summaryStats.bankTotal / (summaryStats.totalPaid || 1)) * 100)}%
                   </td>
-                  {/* Col Z & Actions */}
-                  <td colSpan={2} className="p-2 text-center text-emerald-400 font-sans text-xs">
+                  {/* Col AA: Remarks */}
+                  <td className="p-2 text-center text-emerald-400 font-sans text-xs">
                     {summaryStats.collectionRate}% Realized
                   </td>
                 </tr>
@@ -2749,29 +2801,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           })}
         </div>
 
-        {/* Right: Clean Status Bar Metrics */}
-        <div className="hidden lg:flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 font-mono shrink-0 pl-2">
-          {!isRawMode && (
-            <>
-              <span className="flex items-center gap-1 font-sans font-semibold">
-                <span className="text-slate-400">Records:</span>
-                <span className="text-slate-900 dark:text-white font-bold">{summaryStats.count}</span>
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1 font-sans font-semibold">
-                <span className="text-slate-400">Collected:</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{orgConfig.currencySymbol} {summaryStats.totalPaid.toLocaleString()}</span>
-              </span>
-              <span>•</span>
-            </>
-          )}
-          <span>{sheetTabs.length} sheets active</span>
-          <span>•</span>
-          <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Cloud Synced
-          </span>
-        </div>
+
       </div>
 
       {/* NEW SHEET MODAL (CITY-ENABLED) */}

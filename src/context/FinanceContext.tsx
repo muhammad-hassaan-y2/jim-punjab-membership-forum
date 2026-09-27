@@ -197,6 +197,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeSheetTabId, setActiveSheetTabId] = useState<string>(() => {
     if (typeof window === 'undefined') return 'sheet1';
     try {
+      // Check URL path for /sheets/:id or /dashboard/sheets/:id
+      const pathParts = window.location.pathname.split('/');
+      const sheetsIdx = pathParts.lastIndexOf('sheets');
+      if (sheetsIdx >= 0 && pathParts[sheetsIdx + 1]) {
+        return pathParts[sheetsIdx + 1];
+      }
+      // Fallback: check query params
       const params = new URLSearchParams(window.location.search);
       const sheetParam = params.get('sheet');
       if (sheetParam) return sheetParam;
@@ -307,21 +314,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (dbTxs.status === 'fulfilled') {
         const rawTxs = dbTxs.value;
-        const needsAscendingRewrite = rawTxs.length > 0 && rawTxs.some((tx, idx) => tx.receiptNo !== String(idx + 1));
-        if (needsAscendingRewrite) {
-          const sorted = [...rawTxs].sort((a, b) => {
+        // Per-sheet receipt numbering: group by sheetId, sort within each group, 
+        // and assign sequential receipt numbers per sheet
+        const sheetGroups = new Map<string, typeof rawTxs>();
+        rawTxs.forEach(tx => {
+          const key = tx.sheetId || '__unassigned__';
+          if (!sheetGroups.has(key)) sheetGroups.set(key, []);
+          sheetGroups.get(key)!.push(tx);
+        });
+
+        let needsRewrite = false;
+        const allRewritten: typeof rawTxs = [];
+        
+        sheetGroups.forEach((groupTxs) => {
+          const sorted = [...groupTxs].sort((a, b) => {
             const numA = parseInt(String(a.receiptNo || '').replace(/\D/g, ''), 10);
             const numB = parseInt(String(b.receiptNo || '').replace(/\D/g, ''), 10);
             if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
             return new Date(a.date).getTime() - new Date(b.date).getTime();
           });
-          const rewritten = sorted.map((tx, idx) => ({
-            ...tx,
-            receiptNo: String(idx + 1),
-          }));
-          setTransactions(rewritten);
-          if (rewritten.length > 0) setActiveReceiptTransaction(rewritten[0]);
-          api.bulkSaveTransactions(rewritten, false).catch(console.error);
+          const isSequential = sorted.every((tx, idx) => tx.receiptNo === String(idx + 1));
+          if (!isSequential) needsRewrite = true;
+          sorted.forEach((tx, idx) => {
+            allRewritten.push({ ...tx, receiptNo: String(idx + 1) });
+          });
+        });
+
+        if (needsRewrite && allRewritten.length > 0) {
+          setTransactions(allRewritten);
+          if (allRewritten.length > 0) setActiveReceiptTransaction(allRewritten[0]);
+          api.bulkSaveTransactions(allRewritten, false).catch(console.error);
         } else {
           setTransactions(rawTxs);
           if (rawTxs.length > 0) setActiveReceiptTransaction(rawTxs[0]);
@@ -330,7 +352,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (dbSheets.status === 'fulfilled' && dbSheets.value.length > 0) {
         setSheetTabs(dbSheets.value);
-        setActiveSheetTabId(dbSheets.value[0].id);
+        // Only set active tab to first sheet if no sheet is currently selected
+        // or if the currently-selected sheet no longer exists in the DB
+        const currentIsValid = activeSheetTabId && dbSheets.value.some((s: any) => s.id === activeSheetTabId);
+        if (!currentIsValid) {
+          setActiveSheetTabId(dbSheets.value[0].id);
+        }
       }
 
       if (dbConfig.status === 'fulfilled' && dbConfig.value) {
@@ -718,12 +745,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const clearAllTransactions = async () => {
-    setTransactions([]);
+  const clearAllTransactions = async (sheetId?: string) => {
+    const targetSheetId = sheetId || activeSheetTabId;
+    if (targetSheetId) {
+      // Only clear transactions belonging to the specified sheet
+      setTransactions(prev => prev.filter(t => t.sheetId !== targetSheetId));
+    } else {
+      setTransactions([]);
+    }
     setActiveReceiptTransaction(null);
     try {
       setDbStatus('syncing');
-      await api.clearAllTransactions();
+      await api.clearAllTransactions(targetSheetId || undefined);
       setDbStatus('connected');
     } catch (err) {
       console.error('Failed to clear transactions from Neon DB:', err);

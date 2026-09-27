@@ -55,8 +55,11 @@ export const api = {
     if (!res.ok) throw new Error('Failed to delete transaction from Neon DB');
   },
 
-  async clearAllTransactions(): Promise<void> {
-    const res = await fetch(`${BASE_URL}/transactions`, {
+  async clearAllTransactions(sheetId?: string): Promise<void> {
+    const url = sheetId 
+      ? `${BASE_URL}/transactions?sheetId=${encodeURIComponent(sheetId)}`
+      : `${BASE_URL}/transactions`;
+    const res = await fetch(url, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to clear transactions from Neon DB');

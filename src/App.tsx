@@ -26,14 +26,20 @@ const AppContent: React.FC<AppProps> = ({ initialTab, isDashboardRoute = false, 
   const { activeTab, setActiveTab, activeSheetTabId, setActiveSheetTabId, orgConfig } = useFinance();
   const { isAuthenticated } = useAuth();
 
+  const lastTargetSheetPropRef = React.useRef<string | undefined>(undefined);
+
   React.useEffect(() => {
     if (initialTab && initialTab !== activeTab) {
       setActiveTab(initialTab);
     }
-    if (targetSheetId && targetSheetId !== activeSheetTabId) {
+  }, [initialTab, activeTab, setActiveTab]);
+
+  React.useEffect(() => {
+    if (targetSheetId && targetSheetId !== lastTargetSheetPropRef.current) {
+      lastTargetSheetPropRef.current = targetSheetId;
       setActiveSheetTabId(targetSheetId);
     }
-  }, [initialTab, targetSheetId, activeTab, activeSheetTabId, setActiveTab, setActiveSheetTabId]);
+  }, [targetSheetId, setActiveSheetTabId]);
 
   // Is this view protected by authentication?
   const isProtectedTab = isDashboardRoute || activeTab === 'dashboard' || activeTab === 'sheets' || activeTab === 'receipt' || activeTab === 'analytics' || activeTab === 'donors';
@@ -45,10 +51,10 @@ const AppContent: React.FC<AppProps> = ({ initialTab, isDashboardRoute = false, 
       {/* Top Navbar: Always accessible */}
       <Navbar />
 
-      {/* Main Content Area: Responsive spacing with pt-20 to clear fixed navbar */}
+      {/* Main Content Area: Responsive spacing with full spread for sheets */}
       <main className={`flex-1 w-full mx-auto ${
         activeTab === 'sheets' && isAuthenticated
-          ? 'max-w-[99%] px-1 sm:px-3 pt-20 sm:pt-24 pb-8' 
+          ? 'w-full max-w-none px-0 sm:px-1 pt-16 pb-0' 
           : 'max-w-7xl px-3 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-8'
       }`}>
         {shouldShowAuthGate ? (
