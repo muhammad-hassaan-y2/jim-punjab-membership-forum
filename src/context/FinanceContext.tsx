@@ -210,10 +210,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<FundCategory[]>(defaultCategories);
   const [orgConfig, setOrgConfig] = useState<OrganizationConfig>(defaultOrgConfig);
-  const [sheetTabs, setSheetTabs] = useState<SheetTab[]>(rawBlankSheetTabs);
+  const [sheetTabs, setSheetTabs] = useState<SheetTab[]>([]);
   const [activeSheetTabId, setActiveSheetTabIdState] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'sheet1';
-    return readSheetIdFromLocation() || 'sheet1';
+    if (typeof window === 'undefined') return '';
+    return readSheetIdFromLocation() || '';
   });
   const activeSheetTabIdRef = useRef(activeSheetTabId);
   const setActiveSheetTabId = useCallback((id: string) => {

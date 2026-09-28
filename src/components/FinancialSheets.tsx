@@ -392,7 +392,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: AccountingColKey } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
   const [formulaBarValue, setFormulaBarValue] = useState<string>('');
-
+  const [expandedCell, setExpandedCell] = useState<{ rowId: string; colKey: AccountingColKey; value: string; title: string; rect: DOMRect | null } | null>(null);
   // Template gallery bar toggle
   const [showTemplateBar, setShowTemplateBar] = useState(false);
 
@@ -687,6 +687,23 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     if (!tx) return;
     setEditingCell({ rowId, colKey });
     setCellEditValue(String(getCellValue(tx, colKey)));
+  };
+
+  // Expand cell to show full content in a popup
+  const handleExpandCell = (e: React.MouseEvent, rowId: string, colKey: AccountingColKey) => {
+    e.stopPropagation();
+    const tx = transactions.find(t => t.id === rowId);
+    if (!tx) return;
+    const col = ACCOUNTING_COLUMNS.find(c => c.key === colKey);
+    const cellEl = document.getElementById(`cell-${rowId}-${colKey}`);
+    const rect = cellEl ? cellEl.getBoundingClientRect() : null;
+    setExpandedCell({
+      rowId,
+      colKey,
+      value: String(getCellValue(tx, colKey)),
+      title: col ? `${col.letter}: ${col.titleEn}` : colKey,
+      rect,
+    });
   };
 
   // Commit inline edit
@@ -2307,7 +2324,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2334,7 +2352,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             <span className="text-slate-600 dark:text-slate-300 truncate block">{tx.branchName || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2361,7 +2380,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.zila || tx.city || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2388,7 +2408,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             tx.phone || '---'
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'phone' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2424,7 +2445,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </div>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'receiptNo' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2453,7 +2475,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'sarparastAla' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2484,7 +2507,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'profession' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2513,7 +2537,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2542,7 +2567,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2571,7 +2597,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2611,7 +2638,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                                 </span>
                               )}
                               {isCellSelected && !isCellEditing && (
-                                <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                                <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                               )}
                             </td>
                           );
@@ -2629,7 +2657,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             ₨ {Number(totalRowPaid).toLocaleString()}
                           </span>
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2658,7 +2687,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'targetAmount' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2680,7 +2710,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             </span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2703,7 +2734,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             <option value="DD">Demand Draft (DD)</option>
                           </select>
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'paymentMode' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2730,7 +2762,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             tx.bankName || '---'
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'bankName' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -2757,7 +2790,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">{tx.notes || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' && !editingCell && (
-                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
                         </td>
 
@@ -3323,6 +3357,60 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           setCurrentPage(1);
         }}
       />
+
+      {/* Expanded Cell Popup */}
+      {expandedCell && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setExpandedCell(null)}>
+          <div 
+            className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-emerald-200 dark:border-emerald-700 max-w-lg w-[90vw] max-h-[60vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-emerald-50 dark:bg-emerald-900/30">
+              <div className="flex items-center gap-2">
+                <Grid3X3 size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">{expandedCell.title}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(expandedCell.value || '');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-800/50 text-slate-500 hover:text-emerald-700 transition-colors"
+                  title="Copy value"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  onClick={() => {
+                    // Switch to edit mode for this cell
+                    setEditingCell({ rowId: expandedCell.rowId, colKey: expandedCell.colKey });
+                    setCellEditValue(expandedCell.value);
+                    setExpandedCell(null);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-800/50 text-slate-500 hover:text-emerald-700 transition-colors"
+                  title="Edit cell"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => setExpandedCell(null)}
+                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-600 transition-colors"
+                  title="Close"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            {/* Content */}
+            <div className="p-4 overflow-auto max-h-[45vh]">
+              <div className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-relaxed font-mono bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 min-h-[60px]">
+                {expandedCell.value || <span className="text-slate-400 italic">Empty cell</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
