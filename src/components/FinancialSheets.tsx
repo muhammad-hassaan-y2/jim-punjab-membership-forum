@@ -1400,7 +1400,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     <div className="space-y-4 pb-12">
 
       {/* SPREADSHEET CARD */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+      <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
         
         {/* Hidden file input for import */}
         <input
@@ -1414,40 +1414,33 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         {/* ====================================================================
             CLEAN HEADER: Dashboard Return, Sheet / City Name & Streamlined Actions
             ==================================================================== */}
-        <div className="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex flex-wrap items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 gap-2 bg-white dark:bg-slate-900">
           
-          {/* Left: Back button + Sheet Title & Inline Rename & Delete */}
+          {/* Left: Back button + Sheet Title */}
           <div className="flex items-center gap-3">
             {!isStandaloneShareView ? (
-              <>
-                <button
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      window.location.href = '/dashboard';
-                    } else {
-                      setActiveTab('dashboard');
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow active:scale-95 cursor-pointer"
-                  title="Return to Main Dashboard"
-                >
-                  <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-                  <span>Dashboard</span>
-                </button>
-                <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
-              </>
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/dashboard';
+                  } else {
+                    setActiveTab('dashboard');
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
+                title="Return to Main Dashboard"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Dashboard</span>
+              </button>
             ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>Shared Sheet</span>
               </div>
             )}
 
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
-                <FileSpreadsheet className="w-4 h-4" />
-              </div>
-              
+            <div className="flex items-center gap-2">
               {isEditingSheetName ? (
                 <div className="flex items-center gap-1.5">
                   <input
@@ -1457,12 +1450,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     onChange={(e) => setSheetNameInput(e.target.value)}
                     onKeyDown={handleRenameKeyDown}
                     onBlur={handleSaveRename}
-                    className="px-2.5 py-1 text-sm font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-emerald-500 rounded-lg outline-none shadow-xs w-44 sm:w-56"
+                    className="px-2.5 py-1 text-sm font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-800 border-2 border-emerald-500 rounded-lg outline-none w-44 sm:w-56"
                     placeholder="Sheet / City name..."
                   />
                   <button
                     onMouseDown={(e) => { e.preventDefault(); handleSaveRename(); }}
-                    className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                    className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                     title="Save sheet name"
                   >
                     <Check className="w-3.5 h-3.5" />
@@ -1476,29 +1469,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <h2 
                     onClick={handleStartRename}
-                    className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5 py-0.5 px-1.5 -mx-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 group"
-                    title="Click to rename Sheet & City"
+                    className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1 py-0.5 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 group"
+                    title="Click to rename"
                   >
                     <span>{currentSheetTitle}</span>
-                    <Pencil className="w-3.5 h-3.5 opacity-50 group-hover:opacity-100 text-slate-400 group-hover:text-emerald-600 transition-opacity" />
+                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 text-slate-400 transition-opacity" />
                   </h2>
 
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Are you sure you want to delete sheet "${currentSheetTitle}"?`)) {
-                        deleteSheetTab(activeSheetTabId);
-                      }
-                    }}
-                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-md transition-colors"
-                    title="Delete this sheet"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-
-                  <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full hidden sm:inline-block">
+                  <span className="text-[11px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                     {isRawMode ? `${rawRowCount} rows` : `${filteredTransactions.length} records`}
                   </span>
                 </div>
@@ -1506,17 +1487,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             </div>
           </div>
 
-          {/* Right: Streamlined Action Buttons */}
-          <div className="flex items-center gap-2">
+          {/* Right: Essential Actions Only */}
+          <div className="flex items-center gap-1.5">
             
             {/* + Add Row */}
             <button
               onClick={() => isRawMode ? handleAddRawRows(50) : addBlankRow(1)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors cursor-pointer"
               title="Add new row"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Add Row</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add Row</span>
             </button>
 
             {/* Delete Selected Row — only visible when a row is selected */}
@@ -1531,25 +1512,28 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     setEditingCell(null);
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 shadow-2xs hover:shadow active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
                 title="Delete selected row"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete Row</span>
+                <span className="hidden sm:inline">Delete</span>
               </button>
             )}
 
-            {/* AI Scan Document */}
+            {/* Divider */}
+            <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 hidden sm:block" />
+
+            {/* AI Scan */}
             <button
               onClick={() => setIsGeminiScannerOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 shadow-xs hover:shadow active:scale-95 transition-all border border-amber-300/80 cursor-pointer"
-              title="Scan document or receipt photo with Gemini AI"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+              title="Scan document with AI"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-900" />
+              <Sparkles className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">AI Scan</span>
             </button>
 
-            {/* Download Excel */}
+            {/* Excel Download */}
             <button
               onClick={() => {
                 if (isRawMode) {
@@ -1558,14 +1542,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   exportTransactionsToExcel(filteredTransactions, categories, orgConfig, currentSheetTab?.name || `Sheet_${currentSheetNumber}`);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 hover:text-emerald-600 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-              title="Download as Excel (.xlsx)"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-300 transition-colors cursor-pointer"
+              title="Download Excel"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden md:inline">Excel</span>
+              <Download className="w-3.5 h-3.5" />
             </button>
 
-            {/* Print PDF */}
+            {/* Print */}
             <button
               onClick={() => {
                 if (isRawMode) {
@@ -1574,44 +1557,33 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   printSheetAsPDF(currentSheetTab?.name || `Sheet ${currentSheetNumber}`, filteredTransactions, categories, orgConfig);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-blue-500 hover:text-blue-600 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-300 transition-colors cursor-pointer"
               title="Print PDF"
             >
-              <Printer className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden md:inline">Print</span>
+              <Printer className="w-3.5 h-3.5" />
             </button>
 
-            {/* Share Sheet */}
+            {/* Share */}
             <button
               onClick={handleShareSheet}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                 isLinkCopied
-                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-indigo-700 dark:text-indigo-300 hover:border-indigo-400'
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300'
               }`}
-              title="Copy shareable link"
+              title={isLinkCopied ? "Link copied!" : "Copy shareable link"}
             >
-              {isLinkCopied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  <span className="hidden sm:inline">Share</span>
-                </>
-              )}
+              {isLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Overflow '••• More' Dropdown */}
+            {/* More Actions Menu */}
             <div className="relative">
               <button
                 onClick={() => setIsMoreActionsOpen(!isMoreActionsOpen)}
-                className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors shadow-2xs cursor-pointer"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
                 title="More actions"
               >
-                <MoreHorizontal className="w-4 h-4" />
+                <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
 
               {isMoreActionsOpen && (
@@ -1671,7 +1643,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
         {/* TEMPLATE FILTER BAR (When in Template Mode) */}
         {!isRawMode && (
-          <div className="flex flex-wrap items-center justify-between p-2.5 sm:px-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 gap-2.5 text-xs">
+          <div className="flex flex-wrap items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 gap-2 text-xs">
             
             {/* Search Box on Left */}
             <div className="relative flex-1 min-w-[220px] max-w-sm">
@@ -1777,7 +1749,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         )}
 
         {/* FORMULA BAR */}
-        <div className="flex items-center gap-2 p-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-mono">
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs font-mono">
           
           {/* Active Cell Name Box (e.g. B4) */}
           <div className="w-16 py-1 px-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-center font-bold text-slate-700 dark:text-slate-300">
