@@ -26,13 +26,15 @@ const AppContent: React.FC<AppProps> = ({ initialTab, isDashboardRoute = false, 
   const { activeTab, setActiveTab, activeSheetTabId, setActiveSheetTabId, orgConfig } = useFinance();
   const { isAuthenticated } = useAuth();
 
+  const lastInitialTabPropRef = React.useRef<string | undefined>(undefined);
   const lastTargetSheetPropRef = React.useRef<string | undefined>(undefined);
 
   React.useEffect(() => {
-    if (initialTab && initialTab !== activeTab) {
+    if (initialTab && initialTab !== lastInitialTabPropRef.current) {
+      lastInitialTabPropRef.current = initialTab;
       setActiveTab(initialTab);
     }
-  }, [initialTab, activeTab, setActiveTab]);
+  }, [initialTab, setActiveTab]);
 
   React.useEffect(() => {
     if (targetSheetId && targetSheetId !== lastTargetSheetPropRef.current) {

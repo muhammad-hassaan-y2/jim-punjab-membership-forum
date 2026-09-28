@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFinance } from '../context/FinanceContext';
 import { 
   Coins, 
@@ -83,13 +84,22 @@ export const DashboardView: React.FC = () => {
     }
   }, [isCreateProjectModalOpen]);
 
-  // Handle direct navigation to dynamic sheet route (SPA transition)
+  const router = useRouter();
+
+  // Navigate to a sheet without forcing a full browser reload.
+  // We also keep the dashboard's active-sheet state in sync with the URL.
   const handleOpenSheet = (tabId: string) => {
+    if (!tabId) return;
+
+    const sheetExists = sheetTabs.some((sheet) => sheet.id === tabId);
+    if (!sheetExists) {
+      console.warn(`Cannot open sheet: ${tabId} was not found in loaded sheet tabs.`);
+      return;
+    }
+
     setActiveSheetTabId(tabId);
     setActiveTab('sheets');
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', `/dashboard/sheets/${tabId}`);
-    }
+    router.push(`/dashboard/sheets/${encodeURIComponent(tabId)}`, { scroll: false });
   };
 
   const handleCopyShareLink = (sheetId: string) => {
@@ -180,8 +190,15 @@ export const DashboardView: React.FC = () => {
       setIsCreateProjectModalOpen(false);
       setDbSuccessToast(`Created ${createdTabs.length} sheets for "${projectName}" and saved directly to Neon DB!`);
       setTimeout(() => setDbSuccessToast(null), 4000);
-      if (createdTabs.length > 0 && typeof window !== 'undefined') {
-        window.location.href = `/dashboard/sheets/${createdTabs[0].id}`;
+
+      // Use Next.js client navigation instead of window.location.href.
+      // This prevents a complete page reload and avoids showing a partially
+      // initialized dashboard while the sheet metadata is being fetched again.
+      if (createdTabs.length > 0) {
+        const firstSheetId = createdTabs[0].id;
+        setActiveSheetTabId(firstSheetId);
+        setActiveTab('sheets');
+        router.push(`/dashboard/sheets/${encodeURIComponent(firstSheetId)}`, { scroll: false });
       }
     } catch (err: any) {
       alert('Error creating sheet project: ' + (err?.message || 'Unknown error'));
@@ -286,7 +303,7 @@ export const DashboardView: React.FC = () => {
             </h1>
 
             <p className="text-xs sm:text-sm text-emerald-200/90 max-w-2xl font-medium leading-relaxed">
-              Institutional Financial Control Center • Official Punjab Districts & Zones Membership Accounts • 55 Working Spreadsheets • Campaign Year 2026.
+              Institutional Financial Control Center • Official Punjab Districts & Zones Membership Accounts • {sheetTabs.length} Working Spreadsheets • Campaign Year 2026.
             </p>
           </div>
         </div>
@@ -411,7 +428,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span>Membership collections</span>
-            <span className="font-bold text-emerald-700">Live Across 55 Official Sheets</span>
+            <span className="font-bold text-emerald-700">Live Across {sheetTabs.length} Official Sheets</span>
           </div>
         </div>
 
@@ -443,15 +460,25 @@ export const DashboardView: React.FC = () => {
               <Plus className="w-4 h-4 text-amber-300" />
               <span>+ Create / Configure Project</span>
             </button>
-
-            <button
+<button
               onClick={() => {
-                const targetSheet = activeSheetTabId || (sheetTabs[0]?.id ?? 'sheet-00-sarparast-e-aala');
+                const activeSheetStillExists = activeSheetTabId
+                  ? sheetTabs.some((sheet) => sheet.id === activeSheetTabId)
+                  : false;
+
+                const targetSheet = activeSheetStillExists
+                  ? activeSheetTabId
+                  : sheetTabs[0]?.id;
+
+                if (!targetSheet) {
+                  setDbSuccessToast('No sheets are loaded yet. Please wait for the sheets to finish loading.');
+                  setTimeout(() => setDbSuccessToast(null), 3500);
+                  return;
+                }
+
                 setActiveSheetTabId(targetSheet);
                 setActiveTab('sheets');
-                if (typeof window !== 'undefined') {
-                  window.history.pushState({}, '', `/dashboard/sheets/${targetSheet}`);
-                }
+                router.push(`/dashboard/sheets/${encodeURIComponent(targetSheet)}`, { scroll: false });
               }}
               className="px-4 py-2.5 rounded-xl bg-[#fdfaf3] hover:bg-amber-50 text-emerald-950 font-bold text-xs flex items-center gap-1.5 border border-amber-300/80 cursor-pointer transition-colors shadow-2xs"
             >
@@ -554,10 +581,22 @@ export const DashboardView: React.FC = () => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[580px] overflow-y-auto p-1">
+              {sheetTabs.length === 0 ? (
+                <div className="py-12 px-4 rounded-2xl bg-[#fdfaf3] border border-dashed border-amber-300 text-center">
+                  <div className="mx-auto mb-3 w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">Loading Sheets...</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Waiting for the sheet list to load from the database.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[580px] overflow-y-auto p-1">
                 {filteredSheets.map((sheet, index) => {
                   const isCurrentlyActive = activeSheetTabId === sheet.id;
-                  const itemIndex = sheet.sortOrder !== undefined ? sheet.sortOrder : index;
+                  const itemIndex =
+                    sheet.sortOrder !== undefined ? sheet.sortOrder + 1 : index + 1;
 
                   return (
                     <div 
@@ -577,14 +616,6 @@ export const DashboardView: React.FC = () => {
                             )}
                           </div>
                           
-                          {/* Top-right quick delete */}
-                          <button
-                            onClick={() => handleDeleteSheet(sheet)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title={`Delete sheet "${sheet.name}"`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
 
                         {editingSheetId === sheet.id ? (
@@ -680,7 +711,8 @@ export const DashboardView: React.FC = () => {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>

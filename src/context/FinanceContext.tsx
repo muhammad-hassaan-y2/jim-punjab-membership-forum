@@ -137,6 +137,23 @@ const STORAGE_KEYS = {
   TEMPLATE: 'jamia_finance_active_template',
 };
 
+function readSheetIdFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const pathParts = window.location.pathname.split('/');
+    const sheetsIdx = pathParts.lastIndexOf('sheets');
+    if (sheetsIdx >= 0 && pathParts[sheetsIdx + 1]) {
+      return decodeURIComponent(pathParts[sheetsIdx + 1]);
+    }
+    const params = new URLSearchParams(window.location.search);
+    const sheetParam = params.get('sheet');
+    if (sheetParam) return sheetParam;
+  } catch (e) {
+    console.error(e);
+  }
+  return null;
+}
+
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Theme & Language
   const [theme, setThemeState] = useState<AppTheme>(() => {
@@ -194,24 +211,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [categories, setCategories] = useState<FundCategory[]>(defaultCategories);
   const [orgConfig, setOrgConfig] = useState<OrganizationConfig>(defaultOrgConfig);
   const [sheetTabs, setSheetTabs] = useState<SheetTab[]>(rawBlankSheetTabs);
-  const [activeSheetTabId, setActiveSheetTabId] = useState<string>(() => {
+  const [activeSheetTabId, setActiveSheetTabIdState] = useState<string>(() => {
     if (typeof window === 'undefined') return 'sheet1';
-    try {
-      // Check URL path for /sheets/:id or /dashboard/sheets/:id
-      const pathParts = window.location.pathname.split('/');
-      const sheetsIdx = pathParts.lastIndexOf('sheets');
-      if (sheetsIdx >= 0 && pathParts[sheetsIdx + 1]) {
-        return pathParts[sheetsIdx + 1];
-      }
-      // Fallback: check query params
-      const params = new URLSearchParams(window.location.search);
-      const sheetParam = params.get('sheet');
-      if (sheetParam) return sheetParam;
-    } catch (e) {
-      console.error(e);
-    }
-    return 'sheet1';
+    return readSheetIdFromLocation() || 'sheet1';
   });
+  const activeSheetTabIdRef = useRef(activeSheetTabId);
+  const setActiveSheetTabId = useCallback((id: string) => {
+    activeSheetTabIdRef.current = id;
+    setActiveSheetTabIdState(id);
+  }, []);
   const [activeReceiptTransaction, setActiveReceiptTransaction] = useState<Transaction | null>(null);
 
   // Projects State & Active Project Filter
@@ -365,10 +373,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (dbSheets.status === 'fulfilled' && dbSheets.value.length > 0) {
         setSheetTabs(dbSheets.value);
-        // Only set active tab to first sheet if no sheet is currently selected
-        // or if the currently-selected sheet no longer exists in the DB
-        const currentIsValid = activeSheetTabId && dbSheets.value.some((s: any) => s.id === activeSheetTabId);
-        if (!currentIsValid) {
+        // Use ref + URL so async DB load does not overwrite a sheet the user just picked
+        const preferredId = activeSheetTabIdRef.current || readSheetIdFromLocation();
+        const preferredIsValid =
+          preferredId && dbSheets.value.some((s: SheetTab) => s.id === preferredId);
+        if (preferredIsValid && preferredId !== activeSheetTabIdRef.current) {
+          setActiveSheetTabId(preferredId);
+        } else if (!preferredIsValid) {
           setActiveSheetTabId(dbSheets.value[0].id);
         }
       }
