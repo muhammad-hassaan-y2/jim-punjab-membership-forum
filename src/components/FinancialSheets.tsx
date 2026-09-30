@@ -45,7 +45,9 @@ import {
   ArrowRight,
   FunctionSquare,
   ChevronsUpDown,
-  Rows3
+  Rows3,
+  Calculator,
+  RefreshCw
 } from 'lucide-react';
 import { 
   Transaction, 
@@ -482,6 +484,63 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const [showFormulaHelper, setShowFormulaHelper] = useState<boolean>(false);
   const [formulaSearch, setFormulaSearch] = useState<string>('');
 
+  // Option for calculation: Auto Calculate vs Manual (Calculate or Not)
+  const [isAutoCalculate, setIsAutoCalculate] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jamia_auto_calculate');
+      if (saved !== null) return saved === 'true';
+    }
+    return true; // Default: Auto-calculation is ON
+  });
+  const [isCalculating, setIsCalculating] = useState<boolean>(false);
+  const [calculationToast, setCalculationToast] = useState<string | null>(null);
+
+  const handleToggleAutoCalculate = () => {
+    const nextVal = !isAutoCalculate;
+    setIsAutoCalculate(nextVal);
+    try {
+      localStorage.setItem('jamia_auto_calculate', String(nextVal));
+    } catch (e) {}
+    if (nextVal) {
+      handleRunManualCalculation();
+    }
+  };
+
+  const handleRunManualCalculation = () => {
+    setIsCalculating(true);
+    setTransactions(prev => {
+      return prev.map(t => {
+        if (currentSheetTab && t.sheetId && t.sheetId !== currentSheetTab.id) {
+          return t;
+        }
+        const months = t.monthsData || {};
+        const totalPaid = Object.values(months).length > 0
+          ? Object.values(months).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+          : parseNumericAmount(t.amount);
+
+        let target = t.targetAmount;
+        const mNum = parseNumericAmount(t.monthlyAmount);
+        const qNum = parseNumericAmount(t.quarterlyAmount);
+        const aNum = parseNumericAmount(t.annuallyAmount);
+        if (!target || target === 0) {
+          if (aNum > 0) target = aNum;
+          else if (qNum > 0) target = qNum * 4;
+          else if (mNum > 0) target = mNum * 12;
+          else target = totalPaid;
+        }
+
+        return {
+          ...t,
+          amount: totalPaid,
+          targetAmount: target,
+        };
+      });
+    });
+    setIsCalculating(false);
+    setCalculationToast('✓ Sheet calculated successfully!');
+    setTimeout(() => setCalculationToast(null), 2500);
+  };
+
   // Total table width calculated dynamically from all column widths (with 52px sticky # corner)
   const totalTableWidth = useMemo(() => {
     let sum = 52; // # sticky left row index column
@@ -634,19 +693,33 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       return tx.monthsData?.[colKey as MonthKey] || 0;
     }
     if (colKey === 'amount') {
-      const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
-        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
-        : parseNumericAmount(tx.amount);
-      return paid;
+      if (isAutoCalculate) {
+        const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
+          ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+          : parseNumericAmount(tx.amount);
+        return paid;
+      }
+      return parseNumericAmount(tx.amount);
     }
     if (colKey === 'targetAmount') {
-      return getTransactionTargetAmount(tx);
+      if (isAutoCalculate) {
+        return getTransactionTargetAmount(tx);
+      }
+      return tx.targetAmount !== undefined && tx.targetAmount > 0 
+        ? tx.targetAmount 
+        : (parseNumericAmount(tx.annuallyAmount) || parseNumericAmount(tx.amount) || 0);
     }
     if (colKey === 'balance') {
-      const tgt = getTransactionTargetAmount(tx);
-      const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
-        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
-        : parseNumericAmount(tx.amount);
+      if (isAutoCalculate) {
+        const tgt = getTransactionTargetAmount(tx);
+        const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
+          ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+          : parseNumericAmount(tx.amount);
+        return Math.max(0, tgt - paid);
+      }
+      if ((tx as any).balance !== undefined) return (tx as any).balance;
+      const tgt = Number(tx.targetAmount) || Number(tx.annuallyAmount) || 0;
+      const paid = Number(tx.amount) || 0;
       return Math.max(0, tgt - paid);
     }
     return (tx as any)[colKey] || '';
@@ -788,18 +861,25 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       quarterlyCommitmentsSum += parseNumericAmount(t.quarterlyAmount);
       annuallyCommitmentsSum += parseNumericAmount(t.annuallyAmount);
 
-      const target = getTransactionTargetAmount(t);
+      const target = isAutoCalculate
+        ? getTransactionTargetAmount(t)
+        : (t.targetAmount !== undefined && t.targetAmount > 0
+            ? t.targetAmount
+            : (parseNumericAmount(t.annuallyAmount) || parseNumericAmount(t.amount) || 0));
       totalPledged += Number(target || 0);
 
       const months = t.monthsData || {};
       let rowPaid = 0;
-      if (Object.values(months).length > 0) {
+      if (isAutoCalculate && Object.values(months).length > 0) {
         MONTH_KEYS.forEach(m => {
           const v = parseNumericAmount(months[m]);
           monthSums[m] += v;
           rowPaid += v;
         });
       } else {
+        MONTH_KEYS.forEach(m => {
+          monthSums[m] += parseNumericAmount(months[m]);
+        });
         rowPaid = parseNumericAmount(t.amount);
       }
       totalPaid += rowPaid;
@@ -834,7 +914,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       avg: filteredTransactions.length > 0 ? totalPaid / filteredTransactions.length : 0,
       net: totalPaid,
     };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, isAutoCalculate]);
 
   // Universal cell value resolver for Excel formulas (K1, V2, A5, etc.)
   const getUniversalCellValue = (colStr: string, rowNum: number): any => {
@@ -868,7 +948,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
   // Handle cell double click for inline editing
   const handleCellDoubleClick = (rowId: string, colKey: AccountingColKey) => {
-    if (colKey === 'balance' || colKey === 'amount') return; // Read-only calculated totals
+    if ((colKey === 'balance' || colKey === 'amount') && isAutoCalculate) return; // Read-only only when auto-calculate is ON
     const tx = transactions.find(t => t.id === rowId);
     if (!tx) return;
     setEditingCell({ rowId, colKey });
@@ -979,11 +1059,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       const tx = transactions.find(t => t.id === rowId);
       const currentMonths = tx?.monthsData || {};
       const updatedMonths = { ...currentMonths, [mKey]: numVal };
-      const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (parseNumericAmount(v) || 0), 0);
-      updateTransaction(rowId, {
-        monthsData: updatedMonths,
-        amount: totalSum,
-      });
+      if (isAutoCalculate) {
+        const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (parseNumericAmount(v) || 0), 0);
+        updateTransaction(rowId, {
+          monthsData: updatedMonths,
+          amount: totalSum,
+        });
+      } else {
+        updateTransaction(rowId, {
+          monthsData: updatedMonths,
+        });
+      }
       setEditingCell(null);
       setFormulaBarValue(rawInput);
       return;
@@ -1015,9 +1101,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         const tx = transactions.find(t => t.id === rowId);
         updateTransaction(rowId, {
           monthlyAmount: finalVal,
-          quarterlyAmount: num > 0 ? num * 3 : (tx?.quarterlyAmount || ''),
-          annuallyAmount: num > 0 ? num * 12 : (tx?.annuallyAmount || ''),
-          targetAmount: num > 0 ? num * 12 : (tx?.targetAmount || 0),
+          ...(isAutoCalculate && num > 0 ? {
+            quarterlyAmount: num * 3,
+            annuallyAmount: num * 12,
+            targetAmount: num * 12,
+          } : {}),
           preferredPeriod: isTick ? 'Monthly' : (tx?.preferredPeriod || 'Monthly'),
         });
       } else if (colKey === 'quarterlyAmount') {
@@ -1025,9 +1113,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         const tx = transactions.find(t => t.id === rowId);
         updateTransaction(rowId, {
           quarterlyAmount: finalVal,
-          monthlyAmount: num > 0 ? Math.round(num / 3) : (tx?.monthlyAmount || ''),
-          annuallyAmount: num > 0 ? num * 4 : (tx?.annuallyAmount || ''),
-          targetAmount: num > 0 ? num * 4 : (tx?.targetAmount || 0),
+          ...(isAutoCalculate && num > 0 ? {
+            monthlyAmount: Math.round(num / 3),
+            annuallyAmount: num * 4,
+            targetAmount: num * 4,
+          } : {}),
           preferredPeriod: isTick ? 'Quarterly' : (tx?.preferredPeriod || 'Quarterly'),
         });
       } else if (colKey === 'annuallyAmount') {
@@ -1036,8 +1126,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         updateTransaction(rowId, {
           annuallyAmount: finalVal,
           targetAmount: num > 0 ? num : (tx?.targetAmount || 0),
-          monthlyAmount: num > 0 ? Math.round(num / 12) : (tx?.monthlyAmount || 0),
-          quarterlyAmount: num > 0 ? Math.round(num / 4) : (tx?.quarterlyAmount || 0),
+          ...(isAutoCalculate && num > 0 ? {
+            monthlyAmount: Math.round(num / 12),
+            quarterlyAmount: Math.round(num / 4),
+          } : {}),
           preferredPeriod: isTick ? 'Annually' : (tx?.preferredPeriod || 'Annually'),
         });
       }
@@ -1052,8 +1144,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       finalVal = parseMoneyInput(evalVal);
       updateTransaction(rowId, {
         targetAmount: finalVal,
-        annuallyAmount: finalVal > 0 ? finalVal : '',
+        ...(isAutoCalculate && finalVal > 0 ? { annuallyAmount: finalVal } : {}),
       });
+    } else if (colKey === 'amount') {
+      finalVal = parseMoneyInput(evalVal);
+      updateTransaction(rowId, { amount: finalVal });
+    } else if (colKey === 'balance') {
+      finalVal = parseMoneyInput(evalVal);
+      updateCell(rowId, 'balance' as any, finalVal);
     } else {
       updateCell(rowId, colKey as keyof Transaction, finalVal);
     }
@@ -2258,6 +2356,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
         {/* FORMULA BAR WITH FULL EXCEL FORMULAS */}
         <div className="relative px-4 py-1.5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs font-mono">
+          {/* Toast Alert for Manual Calculation */}
+          {calculationToast && (
+            <div className="absolute top-1.5 right-6 z-50 px-3 py-1 bg-emerald-600 text-white rounded-lg shadow-xl font-sans font-bold text-xs flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+              <Check size={13} strokeWidth={3} />
+              <span>{calculationToast}</span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             
             {/* Active Cell Name Box (e.g. B4) */}
@@ -2413,8 +2518,41 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               />
             </form>
 
-            {/* Controls: Expand Cell, Row Height Density, & Wrap Text */}
+            {/* Controls: Calculate Option, Expand Cell, Row Height Density, & Wrap Text */}
             <div className="flex items-center gap-1.5 shrink-0">
+
+              {/* Option to Calculate or Not (Auto Calculate vs Manual) */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={handleToggleAutoCalculate}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded font-sans font-bold text-[11px] transition-all shadow-2xs active:scale-95 ${
+                    isAutoCalculate
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs'
+                  }`}
+                  title={isAutoCalculate 
+                    ? "Calculation: ON (Click to turn calculation OFF / manual mode)" 
+                    : "Calculation: OFF (Click to turn auto calculation ON)"}
+                >
+                  <Calculator size={12} />
+                  <span>{isAutoCalculate ? 'Calculate: ON' : 'Calculate: OFF'}</span>
+                </button>
+
+                {/* Calculate Now button: appears when calculation is OFF */}
+                {!isAutoCalculate && (
+                  <button
+                    type="button"
+                    onClick={handleRunManualCalculation}
+                    disabled={isCalculating}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-sans font-bold text-[10px] transition-all shadow-2xs active:scale-95 animate-pulse"
+                    title="Calculate all sheet values now on demand"
+                  >
+                    <RefreshCw size={10} className={isCalculating ? 'animate-spin' : ''} />
+                    <span>Calculate Now</span>
+                  </button>
+                )}
+              </div>
               
               {/* Expand Active Cell Button */}
               <button
@@ -2974,14 +3112,22 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     const isRowSelected = selectedCell?.rowId === tx.id;
 
                     // Computed Target, Paid, and Balance for this row
-                    const annualTarget = getTransactionTargetAmount(tx);
+                    const annualTarget = isAutoCalculate
+                      ? getTransactionTargetAmount(tx)
+                      : (tx.targetAmount !== undefined && tx.targetAmount > 0
+                          ? tx.targetAmount
+                          : (parseNumericAmount(tx.annuallyAmount) || parseNumericAmount(tx.amount) || 0));
                     
                     const months = tx.monthsData || {};
-                    const totalRowPaid = Object.values(months).length > 0
-                      ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
-                      : Number(tx.amount || 0);
+                    const totalRowPaid = isAutoCalculate
+                      ? (Object.values(months).length > 0
+                          ? Object.values(months).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+                          : parseNumericAmount(tx.amount))
+                      : parseNumericAmount(tx.amount);
 
-                    const balanceDue = Math.max(0, (annualTarget || 0) - totalRowPaid);
+                    const balanceDue = isAutoCalculate
+                      ? Math.max(0, (annualTarget || 0) - totalRowPaid)
+                      : ((tx as any).balance !== undefined ? parseNumericAmount((tx as any).balance) : Math.max(0, (annualTarget || 0) - totalRowPaid));
                     const isFullyPaid = (annualTarget > 0 && totalRowPaid >= annualTarget) || (annualTarget === 0 && totalRowPaid > 0);
 
                     const customRowH = rowHeights[tx.id];
@@ -3304,17 +3450,31 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           );
                         })}
 
-                        {/* Column W: Money Paid (Calculated) */}
+                        {/* Column W: Money Paid (Calculated / Manual) */}
                         <td 
                           id={`cell-${tx.id}-amount`}
                           onClick={() => handleCellClick(tx.id, rowIndex, 'amount', 'W')}
+                          onDoubleClick={() => !isAutoCalculate && handleCellDoubleClick(tx.id, 'amount')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none bg-emerald-50/30 dark:bg-emerald-950/10 ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
                         >
-                          <span className="text-emerald-600 dark:text-emerald-400 font-black">
-                            ₨ {Number(totalRowPaid).toLocaleString()}
-                          </span>
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'amount' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'amount', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'amount', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                              placeholder="0"
+                            />
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                              ₨ {Number(totalRowPaid).toLocaleString()}
+                            </span>
+                          )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'amount' && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
                             <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
@@ -3356,20 +3516,34 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         <td 
                           id={`cell-${tx.id}-balance`}
                           onClick={() => handleCellClick(tx.id, rowIndex, 'balance', 'Y')}
+                          onDoubleClick={() => !isAutoCalculate && handleCellDoubleClick(tx.id, 'balance')}
                           className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono font-bold cursor-cell relative select-none ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
                         >
-                          {balanceDue <= 0 && isFullyPaid ? (
-                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-black">
-                              ✓ Paid
-                            </span>
+                          {editingCell?.rowId === tx.id && editingCell.colKey === 'balance' ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={cellEditValue}
+                              onChange={(e) => setCellEditValue(e.target.value)}
+                              onBlur={() => handleCommitEdit(tx.id, 'balance', cellEditValue)}
+                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'balance', idx, cellEditValue)}
+                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                              placeholder="0"
+                            />
                           ) : (
-                            <span className="text-amber-600 dark:text-amber-400 font-black">
-                              ₨ {Number(balanceDue).toLocaleString()}
-                            </span>
+                            balanceDue <= 0 && isFullyPaid ? (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-black">
+                                ✓ Paid
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400 font-black">
+                                ₨ {Number(balanceDue).toLocaleString()}
+                              </span>
+                            )
                           )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' && (
+                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'balance' && !editingCell && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
                             <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
                           )}
