@@ -38,7 +38,11 @@ import {
   Users,
   Target,
   CheckCircle2,
-  MoreHorizontal
+  MoreHorizontal,
+  Maximize2,
+  Minimize2,
+  WrapText,
+  ArrowRight
 } from 'lucide-react';
 import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey, COMMON_PROFESSIONS } from '../types/finance';
 
@@ -392,7 +396,62 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: AccountingColKey } | null>(null);
   const [cellEditValue, setCellEditValue] = useState<string>('');
   const [formulaBarValue, setFormulaBarValue] = useState<string>('');
-  const [expandedCell, setExpandedCell] = useState<{ rowId: string; colKey: AccountingColKey; value: string; title: string; rect: DOMRect | null } | null>(null);
+  
+  // Cell Expand State
+  const [expandedCell, setExpandedCell] = useState<{
+    rowId: string;
+    colKey: AccountingColKey;
+    value: string;
+    title: string;
+    donorName?: string;
+    zila?: string;
+    colLetter?: string;
+    rect?: DOMRect | null;
+  } | null>(null);
+  const [expandedCellEditValue, setExpandedCellEditValue] = useState<string>('');
+  const [copiedCellSuccess, setCopiedCellSuccess] = useState<boolean>(false);
+  const [isWrapCells, setIsWrapCells] = useState<boolean>(false);
+
+  // Column resize state — stores custom pixel widths per column key
+  const defaultColWidths: Record<string, number> = useMemo(() => {
+    const twMap: Record<string, number> = { 'w-20': 80, 'w-24': 96, 'w-28': 112, 'w-32': 128, 'w-36': 144, 'w-44': 176, 'w-48': 192 };
+    const map: Record<string, number> = {};
+    ACCOUNTING_COLUMNS.forEach(c => { map[c.key] = twMap[c.width] || 120; });
+    return map;
+  }, []);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => ({ ...defaultColWidths }));
+  const resizingRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
+
+  const handleResizeStart = (e: React.MouseEvent, colKey: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = columnWidths[colKey] || defaultColWidths[colKey] || 120;
+    resizingRef.current = { key: colKey, startX, startW };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = ev.clientX - resizingRef.current.startX;
+      const newW = Math.max(50, resizingRef.current.startW + delta);
+      setColumnWidths(prev => ({ ...prev, [resizingRef.current!.key]: newW }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleResetColWidth = (colKey: string) => {
+    setColumnWidths(prev => ({ ...prev, [colKey]: defaultColWidths[colKey] || 120 }));
+  };
+
   // Template gallery bar toggle
   const [showTemplateBar, setShowTemplateBar] = useState(false);
 
@@ -689,21 +748,75 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     setCellEditValue(String(getCellValue(tx, colKey)));
   };
 
-  // Expand cell to show full content in a popup
-  const handleExpandCell = (e: React.MouseEvent, rowId: string, colKey: AccountingColKey) => {
-    e.stopPropagation();
-    const tx = transactions.find(t => t.id === rowId);
+  // Expand cell to show full content in a popup / modal
+  const handleOpenExpandCell = (e?: React.MouseEvent, rowId?: string, colKey?: AccountingColKey) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    const targetRowId = rowId || selectedCell?.rowId || displayedTransactions[0]?.id;
+    const targetColKey = colKey || selectedCell?.colKey || 'donorName';
+    if (!targetRowId) return;
+
+    const tx = transactions.find(t => t.id === targetRowId);
     if (!tx) return;
-    const col = ACCOUNTING_COLUMNS.find(c => c.key === colKey);
-    const cellEl = document.getElementById(`cell-${rowId}-${colKey}`);
-    const rect = cellEl ? cellEl.getBoundingClientRect() : null;
+    const col = ACCOUNTING_COLUMNS.find(c => c.key === targetColKey);
+    const cellVal = String(getCellValue(tx, targetColKey) ?? '');
+    setExpandedCellEditValue(cellVal);
+    setCopiedCellSuccess(false);
     setExpandedCell({
-      rowId,
-      colKey,
-      value: String(getCellValue(tx, colKey)),
-      title: col ? `${col.letter}: ${col.titleEn}` : colKey,
-      rect,
+      rowId: targetRowId,
+      colKey: targetColKey,
+      value: cellVal,
+      title: col ? `Col ${col.letter}: ${col.titleEn} (${col.titleUr})` : targetColKey,
+      colLetter: col?.letter,
+      donorName: tx.donorName || tx.donorNameUrdu || undefined,
+      zila: tx.zila || undefined,
     });
+  };
+
+  const handleExpandCell = handleOpenExpandCell;
+
+  const handleNavigateExpandedCell = (direction: 'prev' | 'next') => {
+    if (!expandedCell) return;
+    const colIndex = ACCOUNTING_COLUMNS.findIndex(c => c.key === expandedCell.colKey);
+    const rowIndex = displayedTransactions.findIndex(t => t.id === expandedCell.rowId);
+    if (colIndex === -1 || rowIndex === -1) return;
+
+    let nextColIdx = colIndex;
+    let nextRowIdx = rowIndex;
+    if (direction === 'next') {
+      if (colIndex < ACCOUNTING_COLUMNS.length - 1) {
+        nextColIdx++;
+      } else if (rowIndex < displayedTransactions.length - 1) {
+        nextRowIdx++;
+        nextColIdx = 0;
+      }
+    } else {
+      if (colIndex > 0) {
+        nextColIdx--;
+      } else if (rowIndex > 0) {
+        nextRowIdx--;
+        nextColIdx = ACCOUNTING_COLUMNS.length - 1;
+      }
+    }
+    const nextCol = ACCOUNTING_COLUMNS[nextColIdx];
+    const nextTx = displayedTransactions[nextRowIdx];
+    if (nextCol && nextTx) {
+      handleOpenExpandCell(undefined, nextTx.id, nextCol.key);
+      setSelectedCell({
+        rowId: nextTx.id,
+        rowIndex: nextRowIdx,
+        colKey: nextCol.key,
+        colLetter: nextCol.letter,
+      });
+      setFormulaBarValue(String(getCellValue(nextTx, nextCol.key) ?? ''));
+    }
+  };
+
+  const handleSaveExpandedCell = () => {
+    if (!expandedCell) return;
+    handleCommitEdit(expandedCell.rowId, expandedCell.colKey, expandedCellEditValue);
+    setExpandedCell(prev => prev ? { ...prev, value: expandedCellEditValue } : null);
   };
 
   // Commit inline edit
@@ -1779,8 +1892,37 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
             />
           </form>
 
-          <span className="text-[11px] text-slate-400 hidden md:inline font-sans font-semibold">
-            Double-click any cell to edit inline (Enter moves down, Tab moves right)
+          {/* Action Buttons: Expand Cell & Wrap Cells */}
+          <div className="flex items-center gap-1.5 pl-1">
+            <button
+              type="button"
+              onClick={() => handleOpenExpandCell()}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-all font-sans font-bold text-[11px] shadow-2xs hover:shadow-xs active:scale-95"
+              title="Expand selected cell into a full view/edit window"
+            >
+              <Maximize2 size={12} />
+              <span>Expand Cell</span>
+            </button>
+
+            {!isRawMode && (
+              <button
+                type="button"
+                onClick={() => setIsWrapCells(!isWrapCells)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-all font-sans text-[11px] font-semibold active:scale-95 ${
+                  isWrapCells 
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs' 
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+                title={isWrapCells ? "Currently expanding cell text. Click to compact." : "Expand all cells to display full text without truncation"}
+              >
+                <WrapText size={12} />
+                <span>{isWrapCells ? 'Cells Expanded' : 'Expand All'}</span>
+              </button>
+            )}
+          </div>
+
+          <span className="text-[11px] text-slate-400 hidden xl:inline font-sans font-semibold">
+            Double-click to edit inline
           </span>
         </div>
 
@@ -2019,60 +2161,76 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   </th>
 
                   {/* Col A: Name */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-44 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.donorName, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">A</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Name</span>
                       <span className="text-[9px] text-slate-400">نام دہندہ / ممبر</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'donorName')} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
                   {/* Col B: Branch */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.branchName, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">B</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Branch</span>
                       <span className="text-[9px] text-slate-400">شاخ / برانچ</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'branchName')} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
                   {/* Col C: Zila */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.zila, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">C</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Zila</span>
                       <span className="text-[9px] text-slate-400">ضلع</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'zila')} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
                   {/* Col D: Phone */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.phone, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">D</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Phone</span>
                       <span className="text-[9px] text-slate-400">فون نمبر</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'phone')} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
                   {/* Col E: Receipt No */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.receiptNo, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">E</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Receipt No</span>
                       <span className="text-[9px] text-slate-400">رسید نمبر</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'receiptNo')} className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
                   {/* Col F: Sarparast-e-Ala */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.sarparastAla, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
                       <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">F</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Sarparast-e-Ala</span>
                       <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">سرپرست اعلیٰ</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'sarparastAla')} onDoubleClick={() => handleResetColWidth('sarparastAla')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Multi-Tier Group Header: Pledged Commitments (Spans 3 cols: G, H, I) */}
+                  {/* Col G: Profession */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.profession, minWidth: 50 }}>
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">G</span>
+                      <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Profession</span>
+                      <span className="text-[9px] text-slate-400">شعبہ / پیشہ</span>
+                    </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'profession')} onDoubleClick={() => handleResetColWidth('profession')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
+                  </th>
+
+                  {/* Multi-Tier Group Header: Pledged Commitments (Spans 3 cols: H, I, J) */}
                   <th colSpan={3} className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-blue-100/90 via-indigo-100/90 to-blue-100/90 dark:from-blue-950/80 dark:via-indigo-950/80 dark:to-blue-950/80 text-blue-900 dark:text-blue-200">
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-[11px] uppercase tracking-wider font-black">Pledged Target</span>
@@ -2080,7 +2238,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     </div>
                   </th>
 
-                  {/* Multi-Tier Group Header: 2026 Monthly Breakdown (Spans 12 cols: J through U) */}
+                  {/* Multi-Tier Group Header: 2026 Monthly Breakdown (Spans 12 cols: K through V) */}
                   <th colSpan={12} className="p-1.5 border-r border-b border-slate-300 dark:border-slate-700 font-extrabold text-center bg-gradient-to-r from-emerald-100/90 via-teal-100/90 to-emerald-100/90 dark:from-emerald-950/80 dark:via-teal-950/80 dark:to-emerald-950/80 text-emerald-900 dark:text-emerald-200">
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-[11px] uppercase tracking-wider font-black">2026 Monthly Contributions</span>
@@ -2088,99 +2246,109 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     </div>
                   </th>
 
-                  {/* Col V: Money Paid */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col W: Money Paid */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.amount, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">V</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">W</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Money Paid</span>
                       <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">کل وصولی</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'amount')} onDoubleClick={() => handleResetColWidth('amount')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col W: Target Money */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col X: Target Money */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.targetAmount, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">W</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">X</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Target Money</span>
                       <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold">معینہ ہدف</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'targetAmount')} onDoubleClick={() => handleResetColWidth('targetAmount')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col X: Total Remaining */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-28 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col Y: Total Remaining */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.balance, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">X</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Y</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Total Remaining</span>
                       <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold">بقایا واجب الادا</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'balance')} onDoubleClick={() => handleResetColWidth('balance')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col Y: Mode */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-24 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col Z: Mode */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.paymentMode, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Y</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Z</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Mode</span>
                       <span className="text-[9px] text-slate-400">طریقہ</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'paymentMode')} onDoubleClick={() => handleResetColWidth('paymentMode')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col Z: Bank Name */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-32 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col AA: Bank Name */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.bankName, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">Z</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">AA</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Bank Name</span>
                       <span className="text-[9px] text-slate-400">بینک کا نام</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'bankName')} onDoubleClick={() => handleResetColWidth('bankName')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col AA: Remarks */}
-                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 w-36 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle">
+                  {/* Col AB: Remarks */}
+                  <th rowSpan={2} className="p-2 border-r border-b border-slate-300 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 transition-colors text-center align-middle relative" style={{ width: columnWidths.notes, minWidth: 50 }}>
                     <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">AA</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-xs">AB</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700 dark:text-slate-200 truncate">Remarks</span>
                       <span className="text-[9px] text-slate-400">کیفیات</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'notes')} onDoubleClick={() => handleResetColWidth('notes')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                   </th>
                 </tr>
 
-                {/* Subheaders Row: G, H, I (Targets) and J to U (12 Months) */}
+                {/* Subheaders Row: H, I, J (Targets) and K to V (12 Months) */}
                 <tr className="bg-slate-50 dark:bg-slate-850">
-                  {/* Col G: Monthly */}
-                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                  {/* Col H: Monthly */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center bg-blue-50/50 dark:bg-blue-950/30 relative" style={{ width: columnWidths.monthlyAmount, minWidth: 40 }}>
                     <div className="flex flex-col items-center justify-center">
-                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">G</span>
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">H</span>
                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Monthly</span>
                       <span className="text-[8px] text-slate-500">ماہانہ</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'monthlyAmount')} onDoubleClick={() => handleResetColWidth('monthlyAmount')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-blue-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col H: Quarterly */}
-                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                  {/* Col I: Quarterly */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center bg-blue-50/50 dark:bg-blue-950/30 relative" style={{ width: columnWidths.quarterlyAmount, minWidth: 40 }}>
                     <div className="flex flex-col items-center justify-center">
-                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">H</span>
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">I</span>
                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Quarterly</span>
                       <span className="text-[8px] text-slate-500">سہ ماہی</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'quarterlyAmount')} onDoubleClick={() => handleResetColWidth('quarterlyAmount')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-blue-500 transition-colors" /></div>
                   </th>
 
-                  {/* Col I: Annually */}
-                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-24 bg-blue-50/50 dark:bg-blue-950/30">
+                  {/* Col J: Annually */}
+                  <th className="p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center bg-blue-50/50 dark:bg-blue-950/30 relative" style={{ width: columnWidths.annuallyAmount, minWidth: 40 }}>
                     <div className="flex flex-col items-center justify-center">
-                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">I</span>
+                      <span className="font-mono text-blue-700 dark:text-blue-400 font-black text-[10px]">J</span>
                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">Annually</span>
                       <span className="text-[8px] text-slate-500">سالانہ</span>
                     </div>
+                    <div onMouseDown={(e) => handleResizeStart(e, 'annuallyAmount')} onDoubleClick={() => handleResetColWidth('annuallyAmount')} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-blue-500 transition-colors" /></div>
                   </th>
 
-                  {/* Cols J through U: 12 Months */}
+                  {/* Cols K through V: 12 Months */}
                   {MONTH_KEYS.map((mKey, mIdx) => {
-                    const letter = String.fromCharCode(74 + mIdx); // 74 is 'J'
+                    const letter = String.fromCharCode(75 + mIdx); // 75 is 'K'
                     const mLabel = MONTH_LABELS[mKey];
                     const isFocused = focusedMonth === mKey;
                     return (
                       <th
                         key={mKey}
-                        className={`p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center w-20 transition-colors ${
+                        style={{ width: columnWidths[mKey], minWidth: 40 }}
+                        className={`p-1 border-r border-b border-slate-300 dark:border-slate-700 text-center transition-colors relative ${
                           isFocused 
                             ? 'bg-emerald-200 dark:bg-emerald-900/60 font-black text-emerald-900 dark:text-white' 
                             : 'bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-100/50'
@@ -2191,6 +2359,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{mLabel.en}</span>
                           <span className="text-[8px] text-slate-500">{mLabel.ur}</span>
                         </div>
+                        <div onMouseDown={(e) => handleResizeStart(e, mKey)} onDoubleClick={() => handleResetColWidth(mKey)} title="Drag to resize, double-click to reset" className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-emerald-500/50 active:bg-emerald-500 z-40 group"><div className="absolute right-0 top-0 w-0.5 h-full bg-slate-300 group-hover:bg-emerald-500 transition-colors" /></div>
                       </th>
                     );
                   })}
@@ -2321,7 +2490,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className="text-slate-600 dark:text-slate-300 truncate block">{tx.branchName || '---'}</span>
+                            <span className={`text-slate-600 dark:text-slate-300 ${isWrapCells ? 'whitespace-normal break-words leading-relaxed' : 'truncate block'}`}>{tx.branchName || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'branchName' && !editingCell && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
@@ -2349,7 +2518,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className="text-slate-700 dark:text-slate-300 truncate block">{tx.zila || tx.city || '---'}</span>
+                            <span className={`text-slate-700 dark:text-slate-300 ${isWrapCells ? 'whitespace-normal break-words leading-relaxed' : 'truncate block'}`}>{tx.zila || tx.city || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'zila' && !editingCell && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
@@ -2759,7 +2928,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className="text-slate-500 dark:text-slate-400 truncate block max-w-xs">{tx.notes || '---'}</span>
+                            <span className={`text-slate-500 dark:text-slate-400 ${isWrapCells ? 'whitespace-normal break-words leading-relaxed' : 'truncate block max-w-xs'}`}>{tx.notes || '---'}</span>
                           )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'notes' && !editingCell && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
@@ -3330,54 +3499,129 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         }}
       />
 
-      {/* Expanded Cell Popup */}
+      {/* Expanded Cell Modal Window */}
       {expandedCell && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setExpandedCell(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-150" onClick={() => setExpandedCell(null)}>
           <div 
-            className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-emerald-200 dark:border-emerald-700 max-w-lg w-[90vw] max-h-[60vh] overflow-hidden"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-emerald-300 dark:border-emerald-700 max-w-xl w-full overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-emerald-50 dark:bg-emerald-900/30">
-              <div className="flex items-center gap-2">
-                <Grid3X3 size={16} className="text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-200">{expandedCell.title}</span>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-emerald-50 via-teal-50 to-white dark:from-emerald-950/40 dark:via-slate-800 dark:to-slate-800">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-mono font-bold text-sm shadow-xs shrink-0">
+                  {expandedCell.colLetter || <Maximize2 size={16} />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">
+                    {expandedCell.title}
+                  </h3>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    {expandedCell.donorName && (
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300 truncate">
+                        Member: {expandedCell.donorName}
+                      </span>
+                    )}
+                    {expandedCell.zila && (
+                      <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        {expandedCell.zila}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
+
+              {/* Action Buttons: Prev, Next, Copy, Close */}
+              <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(expandedCell.value || '');
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-800/50 text-slate-500 hover:text-emerald-700 transition-colors"
-                  title="Copy value"
+                  type="button"
+                  onClick={() => handleNavigateExpandedCell('prev')}
+                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                  title="Previous cell in row (Left)"
                 >
-                  <Copy size={14} />
+                  <ArrowLeft size={15} />
                 </button>
                 <button
-                  onClick={() => {
-                    // Switch to edit mode for this cell
-                    setEditingCell({ rowId: expandedCell.rowId, colKey: expandedCell.colKey });
-                    setCellEditValue(expandedCell.value);
-                    setExpandedCell(null);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-800/50 text-slate-500 hover:text-emerald-700 transition-colors"
-                  title="Edit cell"
+                  type="button"
+                  onClick={() => handleNavigateExpandedCell('next')}
+                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                  title="Next cell in row (Right)"
                 >
-                  <Pencil size={14} />
+                  <ArrowRight size={15} />
+                </button>
+                <div className="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(expandedCellEditValue || '');
+                    setCopiedCellSuccess(true);
+                    setTimeout(() => setCopiedCellSuccess(false), 2000);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors relative"
+                  title="Copy cell value"
+                >
+                  {copiedCellSuccess ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setExpandedCell(null)}
-                  className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 hover:text-red-600 transition-colors"
-                  title="Close"
+                  className="p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/40 text-slate-500 hover:text-rose-600 transition-colors"
+                  title="Close modal (Esc)"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
             </div>
-            {/* Content */}
-            <div className="p-4 overflow-auto max-h-[45vh]">
-              <div className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-relaxed font-mono bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 min-h-[60px]">
-                {expandedCell.value || <span className="text-slate-400 italic">Empty cell</span>}
+
+            {/* Modal Body / Text Editor */}
+            <div className="p-5 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span className="font-semibold uppercase tracking-wider text-[10px] text-emerald-700 dark:text-emerald-400">
+                  Cell Value (Expanded Content)
+                </span>
+                <span>
+                  {expandedCellEditValue.length} characters • {expandedCellEditValue.trim() ? expandedCellEditValue.trim().split(/\s+/).length : 0} words
+                </span>
+              </div>
+
+              <textarea
+                value={expandedCellEditValue}
+                onChange={(e) => setExpandedCellEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleSaveExpandedCell();
+                  } else if (e.key === 'Escape') {
+                    setExpandedCell(null);
+                  }
+                }}
+                rows={6}
+                placeholder="Enter or edit cell content..."
+                className="w-full p-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all resize-y"
+              />
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-slate-400">
+                  Tip: Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-mono">Ctrl+Enter</kbd> to save
+                </span>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCell(null)}
+                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveExpandedCell}
+                    className="px-4 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs hover:shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <Check size={14} />
+                    <span>Save Changes</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
