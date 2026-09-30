@@ -181,6 +181,21 @@ export const parseNumericAmount = (val: number | string | undefined | null): num
   const str = String(val).trim();
   if (str === '✓' || str === '✔' || str === '✗' || str === '❌' || str.toLowerCase() === 'x') return 0;
   const cleaned = str.replace(/,/g, '');
+  if (/^[=]?\s*[\d\s\+\-\*\/\(\)\.]+$/.test(cleaned) && /[\+\-\*\/]/.test(cleaned)) {
+    try {
+      const expr = cleaned.startsWith('=') ? cleaned.slice(1) : cleaned;
+      const cleanExpr = expr.replace(/[^\d\+\-\*\/\(\)\.]/g, '');
+      if (cleanExpr) {
+        const fn = new Function(`"use strict"; return (${cleanExpr});`);
+        const res = fn();
+        if (typeof res === 'number' && !isNaN(res) && isFinite(res)) {
+          return Math.round(res * 100) / 100;
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 };

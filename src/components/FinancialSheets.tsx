@@ -102,7 +102,25 @@ const PUNJAB_CITIES_PRESET = [
 export const parseMoneyInput = (val: any): number => {
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
   if (!val) return 0;
-  const cleaned = String(val).replace(/,/g, '').replace(/[^\d.-]/g, '');
+  const str = String(val).trim();
+  if (str === '✓' || str === '✔' || str === '✗' || str === '❌' || str.toLowerCase() === 'x') return 0;
+  const withoutCommas = str.replace(/,/g, '');
+  if (/^[=]?\s*[\d\s\+\-\*\/\(\)\.]+$/.test(withoutCommas) && /[\+\-\*\/]/.test(withoutCommas)) {
+    try {
+      const expr = withoutCommas.startsWith('=') ? withoutCommas.slice(1) : withoutCommas;
+      const cleanExpr = expr.replace(/[^\d\+\-\*\/\(\)\.]/g, '');
+      if (cleanExpr) {
+        const fn = new Function(`"use strict"; return (${cleanExpr});`);
+        const res = fn();
+        if (typeof res === 'number' && !isNaN(res) && isFinite(res)) {
+          return Math.round(res * 100) / 100;
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }
+  const cleaned = withoutCommas.replace(/[^\d.-]/g, '');
   const parsed = parseFloat(cleaned);
   return isNaN(parsed) ? 0 : parsed;
 };
@@ -602,13 +620,23 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
   // Helper to extract or compute cell values
   const getCellValue = (tx: Transaction, colKey: AccountingColKey): any => {
+    const formula = cellFormulas[`${tx.id}:${colKey}`];
+    if (formula && isFormula(formula)) {
+      const rIdx = displayedTransactions.findIndex(t => t.id === tx.id);
+      const colLetter = ACCOUNTING_COLUMNS.find(c => c.key === colKey)?.letter;
+      const { result } = evaluateFormula(formula, getUniversalCellValue, {
+        colStr: colLetter,
+        rowNum: rIdx !== -1 ? rIdx + 1 : 1,
+      });
+      return result;
+    }
     if (MONTH_KEYS.includes(colKey as any)) {
       return tx.monthsData?.[colKey as MonthKey] || 0;
     }
     if (colKey === 'amount') {
       const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
-        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
-        : Number(tx.amount || 0);
+        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+        : parseNumericAmount(tx.amount);
       return paid;
     }
     if (colKey === 'targetAmount') {
@@ -617,8 +645,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     if (colKey === 'balance') {
       const tgt = getTransactionTargetAmount(tx);
       const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
-        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
-        : Number(tx.amount || 0);
+        ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (parseNumericAmount(v) || 0), 0)
+        : parseNumericAmount(tx.amount);
       return Math.max(0, tgt - paid);
     }
     return (tx as any)[colKey] || '';
@@ -767,12 +795,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       let rowPaid = 0;
       if (Object.values(months).length > 0) {
         MONTH_KEYS.forEach(m => {
-          const v = Number(months[m]) || 0;
+          const v = parseNumericAmount(months[m]);
           monthSums[m] += v;
           rowPaid += v;
         });
       } else {
-        rowPaid = Number(t.amount || 0);
+        rowPaid = parseNumericAmount(t.amount);
       }
       totalPaid += rowPaid;
 
@@ -811,9 +839,17 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // Universal cell value resolver for Excel formulas (K1, V2, A5, etc.)
   const getUniversalCellValue = (colStr: string, rowNum: number): any => {
     if (isRawMode) {
+      const formula = cellFormulas[`raw_${rowNum}_${colStr.toUpperCase()}`];
+      if (formula && isFormula(formula)) {
+        const { result } = evaluateFormula(formula, (c, r) => rawGridData[r]?.[c.toUpperCase()] ?? 0, {
+          colStr,
+          rowNum
+        });
+        return result;
+      }
       return rawGridData[rowNum]?.[colStr.toUpperCase()] ?? 0;
     } else {
-      const tx = displayedTransactions[rowNum - 1];
+      const tx = displayedTransactions[rowNum - 1] || filteredTransactions[rowNum - 1];
       if (!tx) return 0;
       const colDef = ACCOUNTING_COLUMNS.find(c => c.letter.toUpperCase() === colStr.toUpperCase());
       if (!colDef) return 0;
@@ -943,7 +979,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       const tx = transactions.find(t => t.id === rowId);
       const currentMonths = tx?.monthsData || {};
       const updatedMonths = { ...currentMonths, [mKey]: numVal };
-      const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+      const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (parseNumericAmount(v) || 0), 0);
       updateTransaction(rowId, {
         monthsData: updatedMonths,
         amount: totalSum,
@@ -965,7 +1001,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         finalVal = '✗';
       } else {
         const parsedNum = parseMoneyInput(trimmed);
-        if (parsedNum > 0 && !isNaN(Number(trimmed.replace(/,/g, '')))) {
+        if (parsedNum > 0 || !isNaN(Number(trimmed.replace(/,/g, '')))) {
           finalVal = parsedNum;
         } else {
           finalVal = trimmed;
@@ -981,6 +1017,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           monthlyAmount: finalVal,
           quarterlyAmount: num > 0 ? num * 3 : (tx?.quarterlyAmount || ''),
           annuallyAmount: num > 0 ? num * 12 : (tx?.annuallyAmount || ''),
+          targetAmount: num > 0 ? num * 12 : (tx?.targetAmount || 0),
           preferredPeriod: isTick ? 'Monthly' : (tx?.preferredPeriod || 'Monthly'),
         });
       } else if (colKey === 'quarterlyAmount') {
@@ -990,6 +1027,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           quarterlyAmount: finalVal,
           monthlyAmount: num > 0 ? Math.round(num / 3) : (tx?.monthlyAmount || ''),
           annuallyAmount: num > 0 ? num * 4 : (tx?.annuallyAmount || ''),
+          targetAmount: num > 0 ? num * 4 : (tx?.targetAmount || 0),
           preferredPeriod: isTick ? 'Quarterly' : (tx?.preferredPeriod || 'Quarterly'),
         });
       } else if (colKey === 'annuallyAmount') {
@@ -3244,13 +3282,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                             >
                               {isCellEditing ? (
                                 <input
-                                  type="number"
+                                  type="text"
                                   autoFocus
                                   value={cellEditValue}
                                   onChange={(e) => setCellEditValue(e.target.value)}
                                   onBlur={() => handleCommitEdit(tx.id, mKey as any, cellEditValue)}
                                   onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, mKey as any, idx, cellEditValue)}
                                   className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                                  placeholder="0 or =formula"
                                 />
                               ) : (
                                 <span className={mVal > 0 ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}>
@@ -3293,13 +3332,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         >
                           {editingCell?.rowId === tx.id && editingCell.colKey === 'targetAmount' ? (
                             <input
-                              type="number"
+                              type="text"
                               autoFocus
                               value={cellEditValue}
                               onChange={(e) => setCellEditValue(e.target.value)}
                               onBlur={() => handleCommitEdit(tx.id, 'targetAmount', cellEditValue)}
                               onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'targetAmount', idx, cellEditValue)}
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
+                              placeholder="0 or =formula"
                             />
                           ) : (
                             <span className="font-bold text-blue-700 dark:text-blue-300">
@@ -3445,7 +3485,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   {/* Cols K through V: 12 Month Totals */}
                   {MONTH_KEYS.map((mKey) => (
                     <td key={mKey} className="p-2 text-right border-r border-slate-800 text-emerald-400">
-                      {summaryStats.monthSums[mKey] > 0 ? `₨ ${(summaryStats.monthSums[mKey] / 1000).toFixed(summaryStats.monthSums[mKey] >= 10000 ? 0 : 1)}k` : '—'}
+                      {summaryStats.monthSums[mKey] > 0 ? `₨ ${summaryStats.monthSums[mKey].toLocaleString()}` : '—'}
                     </td>
                   ))}
                   {/* Col W: Total Collected (Money Paid) */}

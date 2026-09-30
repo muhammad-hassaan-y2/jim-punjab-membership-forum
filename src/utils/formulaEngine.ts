@@ -325,10 +325,13 @@ export function evaluateFormula(
       if (!parsed) return 0;
       const val = getCellValue(parsed.colStr, parsed.rowNum);
       if (val === undefined || val === null || val === '') return 0;
-      if (typeof val === 'number') return val;
-      const num = Number(val);
-      if (!isNaN(num)) return num;
-      return String(val);
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      const strVal = String(val).trim();
+      if (strVal === '✓' || strVal === '✔' || strVal === '✗' || strVal === '❌') return 0;
+      const cleaned = strVal.replace(/[₨$,\s]/g, '');
+      const num = Number(cleaned);
+      if (!isNaN(num) && cleaned !== '') return num;
+      return strVal;
     };
 
     // Replace range references e.g. SUM(K1:V1) -> SUM([expanded values])
