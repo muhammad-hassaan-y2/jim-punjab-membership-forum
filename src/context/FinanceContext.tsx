@@ -77,6 +77,8 @@ interface FinanceContextType {
   createProject: (name: string, year: number | string, description?: string) => FinancialProject;
   targetToCollect: number;
   setTargetToCollect: (target: number) => void;
+  isAutoCalculate: boolean;
+  setIsAutoCalculate: (val: boolean) => void;
   totalPledgedTarget: number;
   totalDonorsCount: number;
   totalPaidCount: number;
@@ -155,26 +157,9 @@ function readSheetIdFromLocation(): string | null {
 }
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Theme & Language
-  const [theme, setThemeState] = useState<AppTheme>(() => {
-    if (typeof window === 'undefined') return 'blue';
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.THEME);
-      return (saved === 'green' || saved === 'blue' || saved === 'black-gold') ? saved : 'blue';
-    } catch {
-      return 'blue';
-    }
-  });
-
-  const [language, setLanguageState] = useState<AppLanguage>(() => {
-    if (typeof window === 'undefined') return 'en';
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.LANG);
-      return (saved === 'en' || saved === 'ur') ? saved : 'en';
-    } catch {
-      return 'en';
-    }
-  });
+  // Theme & Language (Persisted in Neon DB organization_config)
+  const [theme, setThemeState] = useState<AppTheme>('blue');
+  const [language, setLanguageState] = useState<AppLanguage>('en');
 
   // Navigation tab (supports shareable links ?tab=sheets&sheet=...)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'landing' | 'sheets' | 'receipt' | 'analytics' | 'donors'>(() => {
@@ -192,15 +177,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   // Active Template
-  const [activeTemplate, setActiveTemplate] = useState<SpreadsheetTemplate>(() => {
-    if (typeof window === 'undefined') return 'blank';
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.TEMPLATE) as SpreadsheetTemplate;
-      return saved || 'blank';
-    } catch {
-      return 'blank';
-    }
-  });
+  const [activeTemplate, setActiveTemplate] = useState<SpreadsheetTemplate>('blank');
 
   // Database Connection Status
   const [dbStatus, setDbStatus] = useState<'connected' | 'syncing' | 'error' | 'connecting'>('connecting');
@@ -222,34 +199,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
   const [activeReceiptTransaction, setActiveReceiptTransaction] = useState<Transaction | null>(null);
 
-  // Projects State & Active Project Filter
-  const [projects, setProjects] = useState<FinancialProject[]>(() => {
-    if (typeof window === 'undefined') return defaultProjects;
-    try {
-      const saved = localStorage.getItem('jamia_projects');
-      return saved ? JSON.parse(saved) : defaultProjects;
-    } catch {
-      return defaultProjects;
-    }
-  });
-
-  const [activeProjectId, setActiveProjectIdState] = useState<string>(() => {
-    if (typeof window === 'undefined') return 'proj-2026';
-    try {
-      const saved = localStorage.getItem('jamia_active_project_id');
-      return saved || 'proj-2026';
-    } catch {
-      return 'proj-2026';
-    }
-  });
+  // Projects State & Active Project Filter (Persisted in Neon DB)
+  const [projects, setProjects] = useState<FinancialProject[]>(defaultProjects);
+  const [activeProjectId, setActiveProjectIdState] = useState<string>('proj-2026');
 
   const setActiveProjectId = (id: string) => {
     setActiveProjectIdState(id);
-    try {
-      localStorage.setItem('jamia_active_project_id', id);
-    } catch (e) {
-      console.error(e);
-    }
+    // Persist activeProjectId to Neon PostgreSQL DB
+    api.saveConfig({
+      ...orgConfig,
+      activeProjectId: id,
+    } as any).catch(err => {
+      console.error('Failed to save activeProjectId to Neon DB:', err);
+    });
   };
 
   const createProject = (name: string, year: number | string = 2026, description?: string): FinancialProject => {
@@ -263,44 +225,45 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
     const updated = [newProj, ...projects];
     setProjects(updated);
-    setActiveProjectId(newProj.id);
-    try {
-      localStorage.setItem('jamia_projects', JSON.stringify(updated));
-      localStorage.setItem('jamia_active_project_id', newProj.id);
-    } catch (e) {
-      console.error(e);
-    }
+    setActiveProjectIdState(newProj.id);
     // Persist directly to Neon PostgreSQL DB
     api.createProject(newProj).catch(err => {
       console.error('Failed to save project to Neon DB:', err);
     });
+    api.saveConfig({
+      ...orgConfig,
+      activeProjectId: newProj.id,
+    } as any).catch(err => {
+      console.error('Failed to save activeProjectId to Neon DB:', err);
+    });
     return newProj;
   };
 
-  // Target Goal to Collect
-  const [targetToCollect, setTargetToCollectState] = useState<number>(() => {
-    if (typeof window === 'undefined') return 10000000;
-    try {
-      const saved = localStorage.getItem('jamia_target_to_collect');
-      return saved ? Number(saved) : 10000000;
-    } catch {
-      return 10000000;
-    }
-  });
+  // Target Goal to Collect (Persisted in Neon DB organization_config)
+  const [targetToCollect, setTargetToCollectState] = useState<number>(10000000);
 
   const setTargetToCollect = (val: number) => {
     setTargetToCollectState(val);
-    try {
-      localStorage.setItem('jamia_target_to_collect', String(val));
-    } catch (e) {
-      console.error(e);
-    }
     // Persist directly to Neon PostgreSQL DB in organization_config
     api.saveConfig({
       ...orgConfig,
       targetToCollect: val,
     } as any).catch(err => {
       console.error('Failed to save targetToCollect to Neon DB:', err);
+    });
+  };
+
+  // Option for calculation: Auto Calculate vs Manual (Calculate or Not) - Persisted in Neon DB
+  const [isAutoCalculate, setIsAutoCalculateState] = useState<boolean>(true);
+
+  const setIsAutoCalculate = (val: boolean) => {
+    setIsAutoCalculateState(val);
+    // Persist directly to Neon PostgreSQL DB in organization_config
+    api.saveConfig({
+      ...orgConfig,
+      isAutoCalculate: val,
+    } as any).catch(err => {
+      console.error('Failed to save isAutoCalculate to Neon DB:', err);
     });
   };
 
@@ -396,16 +359,29 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       if (dbConfig.status === 'fulfilled' && dbConfig.value) {
+        const cfg = dbConfig.value as any;
         setOrgConfig({
           ...defaultOrgConfig,
-          ...dbConfig.value,
+          ...cfg,
           nameEnglish: 'JIM Punjab',
           subHeaderEnglish: 'Jamaat Islahul Muslimeen Punjab',
           nameUrdu: 'جماعت اصلاح المسلمین پنجاب',
           subHeaderUrdu: 'پنجاب زون (Punjab Zone)',
         });
-        if ((dbConfig.value as any).targetToCollect) {
-          setTargetToCollectState(Number((dbConfig.value as any).targetToCollect));
+        if (cfg.targetToCollect !== undefined) {
+          setTargetToCollectState(Number(cfg.targetToCollect));
+        }
+        if (cfg.isAutoCalculate !== undefined) {
+          setIsAutoCalculateState(Boolean(cfg.isAutoCalculate));
+        }
+        if (cfg.activeProjectId) {
+          setActiveProjectIdState(cfg.activeProjectId);
+        }
+        if (cfg.theme) {
+          setThemeState(cfg.theme);
+        }
+        if (cfg.language) {
+          setLanguageState(cfg.language);
         }
       }
     } catch (err) {
@@ -418,9 +394,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     refreshFromDatabase();
   }, [refreshFromDatabase]);
 
-  // Sync theme
+  // Apply theme to DOM
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.THEME, theme);
     document.documentElement.classList.remove('theme-green', 'theme-blue', 'theme-black-gold', 'dark');
     document.documentElement.classList.add(`theme-${theme}`);
     if (theme === 'black-gold') {
@@ -428,19 +403,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [theme]);
 
-  // Sync language
+  // Apply language to DOM
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LANG, language);
     document.documentElement.setAttribute('dir', language === 'ur' ? 'rtl' : 'ltr');
     document.documentElement.setAttribute('lang', language);
   }, [language]);
 
   const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
+    api.saveConfig({
+      ...orgConfig,
+      theme: newTheme,
+    } as any).catch(console.error);
   };
 
   const setLanguage = (newLang: AppLanguage) => {
     setLanguageState(newLang);
+    api.saveConfig({
+      ...orgConfig,
+      language: newLang,
+    } as any).catch(console.error);
   };
 
   const generateNextReceiptNumber = (): string => {
@@ -1180,6 +1162,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         createProject,
         targetToCollect,
         setTargetToCollect,
+        isAutoCalculate,
+        setIsAutoCalculate,
         collectedIn2026,
         activeTemplate,
         setActiveTemplate,

@@ -206,6 +206,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     setIsHistoryModalOpen,
     renameSheetTab,
     rewriteReceiptNumbersAscending,
+    isAutoCalculate,
+    setIsAutoCalculate,
   } = useFinance();
 
   // Active Sheet Tab filter & Sheet Number
@@ -229,16 +231,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       // Zila and City are identical: updating sheet name also updates cityName
       await renameSheetTab(activeSheetTabId, trimmed, trimmed);
       try {
-        localStorage.setItem(`jamia_sheet_name_${activeSheetTabId}`, trimmed);
-        await fetch(`/api/shared/${activeSheetTabId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: trimmed,
-            data: rawGridData,
-            rowCount: rawRowCount
-          })
-        });
+        await api.saveSharedSheet(activeSheetTabId, trimmed, rawGridData, rawRowCount);
       } catch (err) {
         console.error('Error saving renamed sheet to DB:', err);
       }
@@ -267,28 +260,12 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const RAW_COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
   const DEFAULT_RAW_ROWS = 100;
 
-  const [rawRowCount, setRawRowCount] = useState<number>(() => {
-    if (typeof window === 'undefined') return DEFAULT_RAW_ROWS;
-    try {
-      const saved = localStorage.getItem(`jamia_raw_rows_${activeSheetTabId}`);
-      return saved ? Math.max(parseInt(saved, 10), DEFAULT_RAW_ROWS) : DEFAULT_RAW_ROWS;
-    } catch {
-      return DEFAULT_RAW_ROWS;
-    }
-  });
+  const [rawRowCount, setRawRowCount] = useState<number>(DEFAULT_RAW_ROWS);
 
   const [rawAddInput, setRawAddInput] = useState<number>(100);
   const [rawDisplayLimit, setRawDisplayLimit] = useState<'50' | '100' | '250' | '500' | 'all'>('all');
 
-  const [rawGridData, setRawGridData] = useState<Record<number, Record<string, string>>>(() => {
-    if (typeof window === 'undefined') return {};
-    try {
-      const saved = localStorage.getItem(`jamia_raw_grid_${activeSheetTabId}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [rawGridData, setRawGridData] = useState<Record<number, Record<string, string>>>({});
 
   const [selectedRawCell, setSelectedRawCell] = useState<{ row: number; col: string } | null>({ row: 1, col: 'A' });
   const [editingRawCell, setEditingRawCell] = useState<{ row: number; col: string } | null>(null);
@@ -302,15 +279,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     // If in raw mode, sync grid to Neon DB so recipient on another device can view it
     if (isRawMode) {
       try {
-        await fetch(`/api/shared/${activeSheetTabId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: `Sheet ${currentSheetNumber}`,
-            data: rawGridData,
-            rowCount: rawRowCount
-          })
-        });
+        await api.saveSharedSheet(activeSheetTabId, `Sheet ${currentSheetNumber}`, rawGridData, rawRowCount);
       } catch (err) {
         console.error('Error syncing shared sheet to Neon DB:', err);
       }
@@ -330,34 +299,31 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     }
   };
 
-  // Switch tabs -> sync state
+  // Switch tabs -> sync state directly from Neon DB
   useEffect(() => {
     setViewModeOverride(null);
-    try {
-      const savedGrid = localStorage.getItem(`jamia_raw_grid_${activeSheetTabId}`);
-      if (savedGrid) {
-        setRawGridData(JSON.parse(savedGrid));
-      }
-      const savedRows = localStorage.getItem(`jamia_raw_rows_${activeSheetTabId}`);
-      if (savedRows) {
-        setRawRowCount(Math.max(parseInt(savedRows, 10), DEFAULT_RAW_ROWS));
-      }
-    } catch {
+    if (!activeSheetTabId) {
       setRawGridData({});
+      setRawRowCount(DEFAULT_RAW_ROWS);
+      return;
     }
 
-    // Pull from Neon DB shared storage for remote viewers
-    fetch(`/api/shared/${activeSheetTabId}`)
-      .then(res => res.ok ? res.json() : null)
+    // Pull from Neon DB shared storage
+    api.getSharedSheet(activeSheetTabId)
       .then(resData => {
         if (resData && resData.data && Object.keys(resData.data).length > 0) {
-          setRawGridData(prev => ({ ...resData.data, ...prev }));
+          setRawGridData(resData.data);
           if (resData.rowCount) {
-            setRawRowCount(prev => Math.max(prev, resData.rowCount));
+            setRawRowCount(Math.max(resData.rowCount, DEFAULT_RAW_ROWS));
           }
+        } else {
+          setRawGridData({});
+          setRawRowCount(DEFAULT_RAW_ROWS);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Failed to load shared sheet from Neon DB:', err);
+      });
 
     setSelectedRawCell({ row: 1, col: 'A' });
     setEditingRawCell(null);
@@ -404,11 +370,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           [col]: evalVal
         }
       };
-      try {
-        localStorage.setItem(`jamia_raw_grid_${activeSheetTabId}`, JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
 
       // Debounced background sync to Neon DB shared storage
       if (rawSaveTimerRef.current) clearTimeout(rawSaveTimerRef.current);
@@ -426,11 +387,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const handleAddRawRows = (count: number = 20) => {
     setRawRowCount(prev => {
       const next = prev + count;
-      try {
-        localStorage.setItem(`jamia_raw_rows_${activeSheetTabId}`, String(next));
-      } catch (e) {
-        console.error(e);
-      }
       const sheetName = currentSheetTab?.name || `Sheet ${currentSheetNumber}`;
       api.saveSharedSheet(activeSheetTabId, sheetName, rawGridData, next).catch(err => {
         console.error('Failed to update row count in Neon DB:', err);
@@ -442,7 +398,6 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   // ==========================================
   // TEMPLATE MODE STATE (9-COLUMN LEDGER)
   // ==========================================
-  // Active Selected Cell for Template Navigation
   // Active Selected Cell for Template Navigation
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; rowIndex: number; colKey: AccountingColKey; colLetter: string } | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: AccountingColKey } | null>(null);
@@ -484,23 +439,13 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const [showFormulaHelper, setShowFormulaHelper] = useState<boolean>(false);
   const [formulaSearch, setFormulaSearch] = useState<string>('');
 
-  // Option for calculation: Auto Calculate vs Manual (Calculate or Not)
-  const [isAutoCalculate, setIsAutoCalculate] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('jamia_auto_calculate');
-      if (saved !== null) return saved === 'true';
-    }
-    return true; // Default: Auto-calculation is ON
-  });
+  // Option for calculation: Auto Calculate vs Manual (Calculate or Not) - Persisted in Neon DB
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
   const [calculationToast, setCalculationToast] = useState<string | null>(null);
 
   const handleToggleAutoCalculate = () => {
     const nextVal = !isAutoCalculate;
     setIsAutoCalculate(nextVal);
-    try {
-      localStorage.setItem('jamia_auto_calculate', String(nextVal));
-    } catch (e) {}
     if (nextVal) {
       handleRunManualCalculation();
     }
@@ -2229,7 +2174,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         if (window.confirm('Clear all data on this sheet and reset?')) {
                           if (isRawMode) {
                             setRawGridData({});
-                            localStorage.removeItem(`jamia_raw_grid_${activeSheetTabId}`);
+                            const sheetName = currentSheetTab?.name || `Sheet ${currentSheetNumber}`;
+                            api.saveSharedSheet(activeSheetTabId, sheetName, {}, DEFAULT_RAW_ROWS).catch(console.error);
                           } else {
                             clearAllTransactions();
                           }
@@ -4174,14 +4120,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           if (targetId && targetId !== activeSheetTabId) {
             setActiveSheetTabId(targetId);
           }
-          try {
-            const savedGrid = localStorage.getItem(`jamia_raw_grid_${effectiveSheetId}`);
-            if (savedGrid) {
-              setRawGridData(JSON.parse(savedGrid));
+          api.getSharedSheet(effectiveSheetId).then(res => {
+            if (res && res.data) {
+              setRawGridData(res.data);
+              if (res.rowCount) {
+                setRawRowCount(prev => Math.max(prev, res.rowCount));
+              }
             }
-          } catch (e) {
-            console.error(e);
-          }
+          }).catch(console.error);
           setSearchQuery('');
           setSelectedZila('all');
           setSelectedBranch('all');

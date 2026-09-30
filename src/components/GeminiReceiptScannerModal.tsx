@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { api } from '../services/api';
 import { 
   Sparkles, 
   Upload, 
@@ -442,10 +443,10 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
           notes: entry.notes,
         });
 
-        // Also update rawGridData in localStorage for the sheet tab so raw grid view stays synced
+        // Also update rawGridData in Neon DB shared sheet so raw grid view stays synced
         try {
-          const gridKey = `jamia_raw_grid_${targetSheetId}`;
-          const currentRaw = JSON.parse(localStorage.getItem(gridKey) || '{}');
+          const sheetRes = await api.getSharedSheet(targetSheetId);
+          const currentRaw = sheetRes?.data ? { ...sheetRes.data } : {};
           const existingRows = Object.keys(currentRaw).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
           const nextRow = existingRows.length > 0 ? Math.max(...existingRows) + 1 : 1;
           
@@ -465,9 +466,11 @@ export const GeminiReceiptScannerModal: React.FC<GeminiReceiptScannerModalProps>
             'Y': entry.bankName,
             'Z': entry.notes,
           };
-          localStorage.setItem(gridKey, JSON.stringify(currentRaw));
+          const sheetName = sheetRes?.name || 'Sheet';
+          const newRowCount = Math.max(sheetRes?.rowCount || 100, nextRow);
+          await api.saveSharedSheet(targetSheetId, sheetName, currentRaw, newRowCount);
         } catch (e) {
-          // ignore localStorage sync error
+          console.error('Failed to sync scanned receipt to Neon DB raw sheet:', e);
         }
       }
 

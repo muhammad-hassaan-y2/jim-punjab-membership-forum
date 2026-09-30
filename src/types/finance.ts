@@ -144,6 +144,12 @@ export interface OrganizationConfig {
   duaUrdu: string;
   duaEnglish: string;
   bankAccounts: BankAccount[];
+  targetToCollect?: number;
+  isAutoCalculate?: boolean;
+  activeProjectId?: string;
+  columnWidths?: Record<string, number>;
+  theme?: string;
+  language?: string;
 }
 
 export interface DonorSummary {
