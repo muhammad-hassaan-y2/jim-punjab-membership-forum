@@ -453,10 +453,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   }, []);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => ({ ...defaultColWidths }));
   const resizingRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
-  // Row Heights, Density, & Table Width State
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [rowDensity, setRowDensity] = useState<'compact' | 'normal' | 'expanded'>('normal');
   const rowResizingRef = useRef<{ rowId: string; startY: number; startH: number } | null>(null);
+  const templateTableContainerRef = useRef<HTMLDivElement>(null);
+  const rawTableContainerRef = useRef<HTMLDivElement>(null);
 
   // Cell Formulas State (stores raw formula e.g. '=SUM(K1:V1)' for cells)
   const [cellFormulas, setCellFormulas] = useState<Record<string, string>>({});
@@ -1202,14 +1203,67 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     );
   };
 
-  // Helper to scroll active cell into view smoothly like Excel
+  // Helper to scroll active cell into view smoothly like Excel, respecting sticky columns and headers
   const scrollToCell = (elementId: string) => {
     setTimeout(() => {
       const el = document.getElementById(elementId);
-      if (el) {
+      if (!el) return;
+
+      const container = isRawMode 
+        ? rawTableContainerRef.current 
+        : templateTableContainerRef.current;
+
+      if (!container) {
         el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        return;
       }
-    }, 15);
+
+      // If moving to Column A (donorName or raw col A), always reset horizontal scroll smoothly to 0
+      const isColA = elementId.includes('-donorName') || elementId.endsWith('-A');
+      if (isColA) {
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        const stickyLeftWidth = 56; // 52px '#' column + borders
+        const elLeft = el.offsetLeft;
+        const elWidth = el.offsetWidth;
+        const currentScrollLeft = container.scrollLeft;
+        const viewWidth = container.clientWidth;
+
+        // If the cell's left edge is hidden behind the sticky '#' column:
+        if (elLeft - currentScrollLeft < stickyLeftWidth) {
+          container.scrollTo({
+            left: Math.max(0, elLeft - stickyLeftWidth - 8),
+            behavior: 'smooth'
+          });
+        }
+        // If the cell's right edge is off the right side of the visible viewport:
+        else if (elLeft + elWidth - currentScrollLeft > viewWidth) {
+          container.scrollTo({
+            left: elLeft + elWidth - viewWidth + 28,
+            behavior: 'smooth'
+          });
+        }
+      }
+
+      // Vertical alignment respecting sticky header
+      const stickyHeaderHeight = 65;
+      const elTop = el.offsetTop;
+      const elHeight = el.offsetHeight;
+      const currentScrollTop = container.scrollTop;
+      const viewHeight = container.clientHeight;
+
+      if (elTop - currentScrollTop < stickyHeaderHeight) {
+        container.scrollTo({
+          top: Math.max(0, elTop - stickyHeaderHeight - 4),
+          behavior: 'smooth'
+        });
+      } else if (elTop + elHeight - currentScrollTop > viewHeight) {
+        container.scrollTo({
+          top: elTop + elHeight - viewHeight + 16,
+          behavior: 'smooth'
+        });
+      }
+    }, 10);
   };
 
   // Auto-select first cell on load if none selected
@@ -2391,14 +2445,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         {/* MODE A: RAW GOOGLE SHEET & EXCEL SPREADSHEET GRID (COLUMNS A TO Z, ROWS 1-30+) */}
         {/* ========================================================================= */}
         {isRawMode ? (
-          <div className="overflow-x-auto max-h-[620px] bg-white dark:bg-slate-950 select-none">
+          <div ref={rawTableContainerRef} className="overflow-x-auto max-h-[620px] bg-white dark:bg-slate-950 select-none">
             <table className="w-full text-left border-collapse font-sans text-xs">
               
               {/* Header: Columns A through Z */}
               <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700">
                 <tr>
                   {/* Corner Header */}
-                  <th className="w-12 p-2 text-center border-r border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/80 dark:bg-slate-900 sticky left-0 z-30">
+                  <th className="w-12 p-2 text-center border-r border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono font-bold text-[11px] bg-slate-200 dark:bg-slate-900 sticky left-0 z-40">
                     #
                   </th>
 
@@ -2421,7 +2475,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     <tr key={rowNum} className="hover:bg-slate-50 dark:hover:bg-slate-850/50">
                       
                       {/* Sticky Row Number Index */}
-                      <td className={`w-12 p-2 text-center font-mono font-bold border-r border-slate-300 dark:border-slate-700 sticky left-0 z-10 transition-colors select-none ${
+                      <td className={`w-12 p-2 text-center font-mono font-bold border-r border-slate-300 dark:border-slate-700 sticky left-0 z-20 transition-colors select-none ${
                         selectedRawCell?.row === rowNum 
                           ? 'bg-emerald-600 text-white font-black shadow-xs' 
                           : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
@@ -2610,7 +2664,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           /* ========================================================================= */
           <div className="flex flex-col bg-white dark:bg-slate-950">
             {/* Scrollable 26-Column Table */}
-            <div className="overflow-x-auto max-h-[680px]">
+            <div ref={templateTableContainerRef} className="overflow-x-auto max-h-[680px]">
               <table 
                 className="text-left border-collapse font-sans text-xs table-fixed"
                 style={{ width: `${totalTableWidth}px`, minWidth: '100%' }}
@@ -2626,7 +2680,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
               <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700 select-none shadow-xs">
                 <tr>
                   {/* Row Number Corner Box (Sticky Left) */}
-                  <th rowSpan={2} className="w-[52px] p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
+                  <th 
+                    rowSpan={2} 
+                    style={{ width: 52, minWidth: 52, maxWidth: 52 }}
+                    className="w-[52px] p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono font-bold text-xs bg-slate-200 dark:bg-slate-900 sticky left-0 z-40 align-middle shadow-xs"
+                  >
                     #
                   </th>
 
@@ -2909,11 +2967,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                       >
                         {/* Row Number Sticky Left with Draggable Bottom Resize Handle & Expand Toggle */}
                         <td 
-                          style={rowHeightStyle}
-                          className={`w-[52px] p-1 text-center font-mono font-bold border-r border-b border-slate-300 dark:border-slate-700 sticky left-0 z-10 select-none transition-colors relative group/idx ${rowHeightClass} ${
+                          style={{ ...rowHeightStyle, width: 52, minWidth: 52, maxWidth: 52 }}
+                          className={`w-[52px] p-1 text-center font-mono font-bold border-r border-b border-slate-300 dark:border-slate-700 sticky left-0 z-20 select-none transition-colors relative group/idx ${rowHeightClass} ${
                             selectedCell?.rowId === tx.id 
                               ? 'bg-emerald-600 text-white font-black shadow-xs' 
-                              : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                              : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-1">
@@ -2941,10 +2999,10 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                         {/* Column A: Donor Name */}
                         <td 
                           id={`cell-${tx.id}-donorName`}
-                          style={rowHeightStyle}
+                          style={{ ...rowHeightStyle, width: columnWidths.donorName || 176 }}
                           onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'A')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
-                          className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${rowHeightClass} ${
+                          className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 cursor-cell relative select-none overflow-hidden ${rowHeightClass} ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
                         >
@@ -2959,7 +3017,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className={`font-semibold text-slate-800 dark:text-slate-100 ${isExpandedRow ? 'whitespace-normal break-words leading-relaxed' : 'truncate block'}`}>
+                            <span className={`font-semibold text-slate-800 dark:text-slate-100 ${isExpandedRow ? 'whitespace-normal break-words leading-relaxed' : 'truncate max-w-full block'}`}>
                               {tx.donorName || tx.donorNameUrdu || '---'}
                             </span>
                           )}
