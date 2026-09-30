@@ -42,9 +42,13 @@ import {
   Maximize2,
   Minimize2,
   WrapText,
-  ArrowRight
+  ArrowRight,
+  FunctionSquare,
+  ChevronsUpDown,
+  Rows3
 } from 'lucide-react';
 import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey, COMMON_PROFESSIONS } from '../types/finance';
+import { evaluateFormula, isFormula, EXCEL_FORMULA_DOCS, colLetterToIndex, indexToColLetter } from '../utils/formulaEngine';
 
 export type AccountingColKey = 
   | 'donorName' 
@@ -344,12 +348,28 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const rawSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleRawCellChange = (row: number, col: string, val: string) => {
+    let evalVal = val;
+    if (isFormula(val)) {
+      const { result, error } = evaluateFormula(val, (cStr, rNum) => {
+        return rawGridData[rNum]?.[cStr.toUpperCase()] ?? 0;
+      }, { colStr: col, rowNum: row });
+      if (error) console.warn('Raw formula error:', error);
+      evalVal = String(result);
+      setCellFormulas(prev => ({ ...prev, [`raw_${row}_${col}`]: val }));
+    } else {
+      setCellFormulas(prev => {
+        const next = { ...prev };
+        delete next[`raw_${row}_${col}`];
+        return next;
+      });
+    }
+
     setRawGridData(prev => {
       const updated = {
         ...prev,
         [row]: {
           ...(prev[row] || {}),
-          [col]: val
+          [col]: evalVal
         }
       };
       try {
@@ -421,6 +441,24 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   }, []);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => ({ ...defaultColWidths }));
   const resizingRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
+  // Row Heights, Density, & Table Width State
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const [rowDensity, setRowDensity] = useState<'compact' | 'normal' | 'expanded'>('normal');
+  const rowResizingRef = useRef<{ rowId: string; startY: number; startH: number } | null>(null);
+
+  // Cell Formulas State (stores raw formula e.g. '=SUM(K1:V1)' for cells)
+  const [cellFormulas, setCellFormulas] = useState<Record<string, string>>({});
+  const [showFormulaHelper, setShowFormulaHelper] = useState<boolean>(false);
+  const [formulaSearch, setFormulaSearch] = useState<string>('');
+
+  // Total table width calculated dynamically from all column widths (with 52px sticky # corner)
+  const totalTableWidth = useMemo(() => {
+    let sum = 52; // # sticky left row index column
+    ACCOUNTING_COLUMNS.forEach(col => {
+      sum += columnWidths[col.key] || defaultColWidths[col.key] || 120;
+    });
+    return sum;
+  }, [columnWidths, defaultColWidths]);
 
   const handleResizeStart = (e: React.MouseEvent, colKey: string) => {
     e.preventDefault();
@@ -450,6 +488,53 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
   const handleResetColWidth = (colKey: string) => {
     setColumnWidths(prev => ({ ...prev, [colKey]: defaultColWidths[colKey] || 120 }));
+  };
+
+  const handleRowResizeStart = (e: React.MouseEvent, rowId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startH = rowHeights[rowId] || (rowDensity === 'compact' ? 32 : rowDensity === 'expanded' ? 70 : 40);
+    rowResizingRef.current = { rowId, startY, startH };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!rowResizingRef.current) return;
+      const delta = ev.clientY - rowResizingRef.current.startY;
+      const newH = Math.max(28, Math.min(300, rowResizingRef.current.startH + delta));
+      setRowHeights(prev => ({ ...prev, [rowResizingRef.current!.rowId]: newH }));
+    };
+    const onUp = () => {
+      rowResizingRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleToggleRowExpand = (rowId: string) => {
+    setRowHeights(prev => {
+      const curH = prev[rowId] || 40;
+      return {
+        ...prev,
+        [rowId]: curH > 55 ? 40 : 85,
+      };
+    });
+  };
+
+  const handleExpandAllRows = () => {
+    setRowDensity(prev => {
+      if (prev === 'expanded') {
+        setIsWrapCells(false);
+        return 'normal';
+      }
+      setIsWrapCells(true);
+      return 'expanded';
+    });
   };
 
   // Template gallery bar toggle
@@ -731,12 +816,26 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     };
   }, [filteredTransactions]);
 
+  // Universal cell value resolver for Excel formulas (K1, V2, A5, etc.)
+  const getUniversalCellValue = (colStr: string, rowNum: number): any => {
+    if (isRawMode) {
+      return rawGridData[rowNum]?.[colStr.toUpperCase()] ?? 0;
+    } else {
+      const tx = displayedTransactions[rowNum - 1];
+      if (!tx) return 0;
+      const colDef = ACCOUNTING_COLUMNS.find(c => c.letter.toUpperCase() === colStr.toUpperCase());
+      if (!colDef) return 0;
+      return getCellValue(tx, colDef.key);
+    }
+  };
+
   // Handle cell click selection
   const handleCellClick = (rowId: string, rowIndex: number, colKey: AccountingColKey, colLetter: string) => {
     const tx = transactions.find(t => t.id === rowId);
     if (!tx) return;
     setSelectedCell({ rowId, rowIndex, colKey, colLetter });
-    setFormulaBarValue(String(getCellValue(tx, colKey)));
+    const formula = cellFormulas[`${rowId}:${colKey}`];
+    setFormulaBarValue(formula || String(getCellValue(tx, colKey)));
   };
 
   // Handle cell double click for inline editing
@@ -745,7 +844,8 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     const tx = transactions.find(t => t.id === rowId);
     if (!tx) return;
     setEditingCell({ rowId, colKey });
-    setCellEditValue(String(getCellValue(tx, colKey)));
+    const formula = cellFormulas[`${rowId}:${colKey}`];
+    setCellEditValue(formula || String(getCellValue(tx, colKey)));
   };
 
   // Expand cell to show full content in a popup / modal
@@ -819,11 +919,35 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     setExpandedCell(prev => prev ? { ...prev, value: expandedCellEditValue } : null);
   };
 
-  // Commit inline edit
+  // Commit inline edit with Excel formula evaluation support
   const handleCommitEdit = (rowId: string, colKey: AccountingColKey, value: string) => {
+    let rawInput = value;
+    let evalVal = value;
+    
+    // Evaluate Excel formula if starts with '='
+    if (isFormula(value)) {
+      const rIdx = displayedTransactions.findIndex(t => t.id === rowId);
+      const colLetter = ACCOUNTING_COLUMNS.find(c => c.key === colKey)?.letter;
+      const { result, error } = evaluateFormula(value, getUniversalCellValue, {
+        colStr: colLetter,
+        rowNum: rIdx !== -1 ? rIdx + 1 : 1,
+      });
+      if (error) {
+        console.warn('Excel Formula Error:', error);
+      }
+      setCellFormulas(prev => ({ ...prev, [`${rowId}:${colKey}`]: value }));
+      evalVal = String(result);
+    } else {
+      setCellFormulas(prev => {
+        const next = { ...prev };
+        delete next[`${rowId}:${colKey}`];
+        return next;
+      });
+    }
+
     if (MONTH_KEYS.includes(colKey as any)) {
       const mKey = colKey as MonthKey;
-      const numVal = parseMoneyInput(value);
+      const numVal = parseMoneyInput(evalVal);
       const tx = transactions.find(t => t.id === rowId);
       const currentMonths = tx?.monthsData || {};
       const updatedMonths = { ...currentMonths, [mKey]: numVal };
@@ -833,19 +957,19 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         amount: totalSum,
       });
       setEditingCell(null);
-      setFormulaBarValue(String(numVal));
+      setFormulaBarValue(rawInput);
       return;
     }
 
-    let finalVal: any = value;
+    let finalVal: any = evalVal;
     if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount', 'targetAmount'].includes(colKey as string)) {
-      finalVal = parseMoneyInput(value);
+      finalVal = parseMoneyInput(evalVal);
     }
 
     updateCell(rowId, colKey as keyof Transaction, finalVal);
 
     if (colKey === 'monthlyAmount') {
-      const num = parseMoneyInput(value);
+      const num = parseMoneyInput(evalVal);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         monthlyAmount: num,
@@ -854,7 +978,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Monthly',
       });
     } else if (colKey === 'quarterlyAmount') {
-      const num = parseMoneyInput(value);
+      const num = parseMoneyInput(evalVal);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         quarterlyAmount: num,
@@ -863,7 +987,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Quarterly',
       });
     } else if (colKey === 'annuallyAmount') {
-      const num = parseMoneyInput(value);
+      const num = parseMoneyInput(evalVal);
       const tx = transactions.find(t => t.id === rowId);
       updateTransaction(rowId, {
         annuallyAmount: num,
@@ -873,7 +997,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
         preferredPeriod: 'Annually',
       });
     } else if (colKey === 'targetAmount') {
-      const num = parseMoneyInput(value);
+      const num = parseMoneyInput(evalVal);
       updateTransaction(rowId, {
         targetAmount: num,
         annuallyAmount: num,
@@ -881,7 +1005,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     }
 
     setEditingCell(null);
-    setFormulaBarValue(String(finalVal));
+    setFormulaBarValue(rawInput);
   };
 
   // Quick-Pay action: Record donor's monthly pledge for active or current month
@@ -1861,69 +1985,227 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           </div>
         )}
 
-        {/* FORMULA BAR */}
-        <div className="flex items-center gap-2 px-4 py-1.5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs font-mono">
-          
-          {/* Active Cell Name Box (e.g. B4) */}
-          <div className="w-16 py-1 px-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-center font-bold text-slate-700 dark:text-slate-300">
-            {activeCellCoord}
-          </div>
+        {/* FORMULA BAR WITH FULL EXCEL FORMULAS */}
+        <div className="relative px-4 py-1.5 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-2">
+            
+            {/* Active Cell Name Box (e.g. B4) */}
+            <div className="w-16 py-1 px-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-center font-bold text-slate-700 dark:text-slate-300 text-xs shrink-0 select-none">
+              {activeCellCoord}
+            </div>
 
-          {/* fx Function Symbol */}
-          <div className="text-slate-400 font-bold italic px-1 select-none">
-            fx
-          </div>
-
-          {/* Live Formula / Value Input */}
-          <form onSubmit={handleFormulaBarSubmit} className="flex-1">
-            <input
-              type="text"
-              value={formulaBarValue}
-              onChange={(e) => setFormulaBarValue(e.target.value)}
-              onBlur={() => {
-                if (isRawMode && selectedRawCell) {
-                  handleRawCellChange(selectedRawCell.row, selectedRawCell.col, formulaBarValue);
-                } else if (!isRawMode && selectedCell) {
-                  handleCommitEdit(selectedCell.rowId, selectedCell.colKey, formulaBarValue);
-                }
-              }}
-              placeholder={isRawMode ? "Type text, numbers, or formula (=SUM(A1:A10)) into active cell..." : "Type text or value and press Enter to commit..."}
-              className="w-full py-1 px-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-mono"
-            />
-          </form>
-
-          {/* Action Buttons: Expand Cell & Wrap Cells */}
-          <div className="flex items-center gap-1.5 pl-1">
-            <button
-              type="button"
-              onClick={() => handleOpenExpandCell()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-all font-sans font-bold text-[11px] shadow-2xs hover:shadow-xs active:scale-95"
-              title="Expand selected cell into a full view/edit window"
-            >
-              <Maximize2 size={12} />
-              <span>Expand Cell</span>
-            </button>
-
-            {!isRawMode && (
+            {/* fx Excel Formulas Dropdown Button */}
+            <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setIsWrapCells(!isWrapCells)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-all font-sans text-[11px] font-semibold active:scale-95 ${
-                  isWrapCells 
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs' 
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                onClick={() => setShowFormulaHelper(!showFormulaHelper)}
+                className={`px-2 py-1 rounded border text-xs font-bold italic transition-all flex items-center gap-1 shadow-2xs ${
+                  showFormulaHelper
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                 }`}
-                title={isWrapCells ? "Currently expanding cell text. Click to compact." : "Expand all cells to display full text without truncation"}
+                title="Open Excel Formulas Helper (SUM, AVERAGE, IF, COUNT, etc.)"
               >
-                <WrapText size={12} />
-                <span>{isWrapCells ? 'Cells Expanded' : 'Expand All'}</span>
+                <span>fx</span>
+                <ChevronDown size={11} className={`transition-transform duration-150 ${showFormulaHelper ? 'rotate-180' : ''}`} />
               </button>
-            )}
-          </div>
 
-          <span className="text-[11px] text-slate-400 hidden xl:inline font-sans font-semibold">
-            Double-click to edit inline
-          </span>
+              {/* Excel Formulas Helper Popover */}
+              {showFormulaHelper && (
+                <div 
+                  className="absolute left-0 top-full mt-1.5 w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-emerald-300 dark:border-emerald-700 z-50 overflow-hidden font-sans"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <FunctionSquare size={16} className="text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-bold text-xs text-emerald-900 dark:text-emerald-200">Excel Formulas Library</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowFormulaHelper(false)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* Formula Search Input */}
+                  <div className="p-2 border-b border-slate-100 dark:border-slate-750">
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        autoFocus
+                        value={formulaSearch}
+                        onChange={(e) => setFormulaSearch(e.target.value)}
+                        placeholder="Search formulas e.g. SUM, AVG, IF, COUNT..."
+                        className="w-full pl-8 pr-3 py-1 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Preset Buttons */}
+                  <div className="px-2.5 py-1.5 bg-slate-50/60 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-750 flex flex-wrap gap-1 text-[10px]">
+                    <span className="text-slate-400 font-bold self-center pr-1">Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const r = isRawMode ? (selectedRawCell?.row || 1) : (selectedCell ? selectedCell.rowIndex + 1 : 1);
+                        const f = `=SUM(K${r}:V${r})`;
+                        setFormulaBarValue(f);
+                        setShowFormulaHelper(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 font-mono text-emerald-700 dark:text-emerald-300 font-bold"
+                    >
+                      =SUM(K:V)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const r = isRawMode ? (selectedRawCell?.row || 1) : (selectedCell ? selectedCell.rowIndex + 1 : 1);
+                        const f = `=AVERAGE(K${r}:V${r})`;
+                        setFormulaBarValue(f);
+                        setShowFormulaHelper(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 font-mono text-blue-700 dark:text-blue-300 font-bold"
+                    >
+                      =AVERAGE(K:V)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const r = isRawMode ? (selectedRawCell?.row || 1) : (selectedCell ? selectedCell.rowIndex + 1 : 1);
+                        const f = `=H${r}*12`;
+                        setFormulaBarValue(f);
+                        setShowFormulaHelper(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-500 font-mono text-indigo-700 dark:text-indigo-300 font-bold"
+                    >
+                      =H*12
+                    </button>
+                  </div>
+
+                  {/* Formula List */}
+                  <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-750 p-1">
+                    {EXCEL_FORMULA_DOCS
+                      .filter(f => !formulaSearch || f.name.toLowerCase().includes(formulaSearch.toLowerCase()) || f.description.toLowerCase().includes(formulaSearch.toLowerCase()))
+                      .map(f => {
+                        const r = isRawMode ? (selectedRawCell?.row || 1) : (selectedCell ? selectedCell.rowIndex + 1 : 1);
+                        const readyTemplate = f.template.replace(/\{row\}/g, String(r));
+                        return (
+                          <div 
+                            key={f.name}
+                            onClick={() => {
+                              setFormulaBarValue(readyTemplate);
+                              setShowFormulaHelper(false);
+                            }}
+                            className="p-2 rounded-lg hover:bg-emerald-50/80 dark:hover:bg-slate-750 transition-colors cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold text-xs text-emerald-700 dark:text-emerald-400 group-hover:text-emerald-800">
+                                {f.name}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 font-semibold">
+                                {f.category}
+                              </span>
+                            </div>
+                            <div className="font-mono text-[10px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5">
+                              {f.syntax}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                              {f.description}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Formula / Value Input */}
+            <form onSubmit={handleFormulaBarSubmit} className="flex-1 min-w-[200px]">
+              <input
+                type="text"
+                value={formulaBarValue}
+                onChange={(e) => setFormulaBarValue(e.target.value)}
+                onBlur={() => {
+                  if (isRawMode && selectedRawCell) {
+                    handleRawCellChange(selectedRawCell.row, selectedRawCell.col, formulaBarValue);
+                  } else if (!isRawMode && selectedCell) {
+                    handleCommitEdit(selectedCell.rowId, selectedCell.colKey, formulaBarValue);
+                  }
+                }}
+                placeholder="Type value or Excel formula e.g. =SUM(K1:V1), =AVERAGE(K1:V1), =H1*12, =IF(Y1>0, 'DUE', 'PAID')..."
+                className="w-full py-1 px-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs font-mono placeholder:text-slate-400"
+              />
+            </form>
+
+            {/* Controls: Expand Cell, Row Height Density, & Wrap Text */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              
+              {/* Expand Active Cell Button */}
+              <button
+                type="button"
+                onClick={() => handleOpenExpandCell()}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-all font-sans font-bold text-[11px] shadow-2xs hover:shadow-xs active:scale-95"
+                title="Expand active cell into full window (view, edit, format, navigate)"
+              >
+                <Maximize2 size={12} />
+                <span>Expand Cell</span>
+              </button>
+
+              {/* Row & Cell Density (Compact / Normal / Expanded) */}
+              {!isRawMode && (
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-[10px] font-sans font-bold">
+                  <button
+                    type="button"
+                    onClick={() => { setRowDensity('compact'); setIsWrapCells(false); }}
+                    className={`px-1.5 py-0.5 rounded transition-colors ${rowDensity === 'compact' ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                    title="Compact rows (32px)"
+                  >
+                    Compact
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setRowDensity('normal'); setIsWrapCells(false); }}
+                    className={`px-1.5 py-0.5 rounded transition-colors ${rowDensity === 'normal' ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                    title="Normal rows (40px)"
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExpandAllRows}
+                    className={`px-1.5 py-0.5 rounded transition-colors ${rowDensity === 'expanded' || isWrapCells ? 'bg-emerald-600 text-white shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'}`}
+                    title="Expand all rows & wrap text (shows complete cell content)"
+                  >
+                    Expanded
+                  </button>
+                </div>
+              )}
+
+              {/* Wrap Text Toggle */}
+              {!isRawMode && (
+                <button
+                  type="button"
+                  onClick={() => setIsWrapCells(!isWrapCells)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md border transition-all font-sans text-[11px] font-semibold active:scale-95 ${
+                    isWrapCells 
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs' 
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                  title={isWrapCells ? "Currently wrapping cell text. Click to compact." : "Expand all cells to show full text without truncation"}
+                >
+                  <WrapText size={12} />
+                  <span>{isWrapCells ? 'Wrapped' : 'Wrap'}</span>
+                </button>
+              )}
+
+            </div>
+
+          </div>
         </div>
 
         {/* ========================================================================= */}
@@ -2150,13 +2432,22 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
           <div className="flex flex-col bg-white dark:bg-slate-950">
             {/* Scrollable 26-Column Table */}
             <div className="overflow-x-auto max-h-[680px]">
-              <table className="w-full text-left border-collapse font-sans text-xs">
+              <table 
+                className="text-left border-collapse font-sans text-xs table-fixed"
+                style={{ width: `${totalTableWidth}px`, minWidth: '100%' }}
+              >
+                <colgroup>
+                  <col style={{ width: '52px' }} />
+                  {ACCOUNTING_COLUMNS.map((col) => (
+                    <col key={col.key} style={{ width: `${columnWidths[col.key] || defaultColWidths[col.key] || 120}px` }} />
+                  ))}
+                </colgroup>
               
               {/* Column Letter & Title Headers */}
               <thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-800 border-b-2 border-slate-300 dark:border-slate-700 select-none shadow-xs">
                 <tr>
                   {/* Row Number Corner Box (Sticky Left) */}
-                  <th rowSpan={2} className="w-12 p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
+                  <th rowSpan={2} className="w-[52px] p-2 text-center border-r border-b border-slate-300 dark:border-slate-700 text-slate-500 font-mono text-[11px] bg-slate-200/90 dark:bg-slate-900 sticky left-0 z-30 align-middle">
                     #
                   </th>
 
@@ -2424,28 +2715,63 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     const balanceDue = Math.max(0, (annualTarget || 0) - totalRowPaid);
                     const isFullyPaid = (annualTarget > 0 && totalRowPaid >= annualTarget) || (annualTarget === 0 && totalRowPaid > 0);
 
+                    const customRowH = rowHeights[tx.id];
+                    const rowHeightStyle = customRowH ? { height: `${customRowH}px` } : undefined;
+                    const isExpandedRow = rowDensity === 'expanded' || isWrapCells || (customRowH && customRowH > 55);
+                    const rowHeightClass = customRowH 
+                      ? '' 
+                      : rowDensity === 'compact' 
+                        ? 'h-8' 
+                        : isExpandedRow 
+                          ? 'min-h-[72px]' 
+                          : 'h-10';
+
                     return (
                       <tr 
                         key={tx.id}
-                        className={`hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors group ${
+                        style={rowHeightStyle}
+                        className={`hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors group/row ${rowHeightClass} ${
                           isRowSelected ? 'bg-blue-50/30 dark:bg-slate-800/30' : ''
                         }`}
                       >
-                        {/* Row Number (1, 2, 3...) Sticky Left */}
-                        <td className={`w-12 p-2 text-center font-mono font-bold border-r border-slate-300 dark:border-slate-700 sticky left-0 z-10 select-none transition-colors ${
-                          selectedCell?.rowId === tx.id 
-                            ? 'bg-emerald-600 text-white font-black shadow-xs' 
-                            : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
-                        }`}>
-                          {rowIndex + 1}
+                        {/* Row Number Sticky Left with Draggable Bottom Resize Handle & Expand Toggle */}
+                        <td 
+                          style={rowHeightStyle}
+                          className={`w-[52px] p-1 text-center font-mono font-bold border-r border-b border-slate-300 dark:border-slate-700 sticky left-0 z-10 select-none transition-colors relative group/idx ${rowHeightClass} ${
+                            selectedCell?.rowId === tx.id 
+                              ? 'bg-emerald-600 text-white font-black shadow-xs' 
+                              : 'bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{rowIndex + 1}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleToggleRowExpand(tx.id); }}
+                              className="opacity-0 group-hover/idx:opacity-100 hover:text-emerald-500 transition-opacity p-0.5 rounded text-slate-400"
+                              title="Toggle expand row height"
+                            >
+                              <Maximize2 size={8} />
+                            </button>
+                          </div>
+                          {/* Draggable bottom border to resize row height */}
+                          <div
+                            onMouseDown={(e) => handleRowResizeStart(e, tx.id)}
+                            onDoubleClick={() => handleToggleRowExpand(tx.id)}
+                            title="Drag to resize row height, double-click to toggle expand"
+                            className="absolute bottom-0 left-0 w-full h-1.5 cursor-row-resize hover:bg-emerald-500 active:bg-emerald-600 z-30 group/handle"
+                          >
+                            <div className="w-full h-0.5 bg-slate-300 dark:bg-slate-700 group-hover/handle:bg-emerald-500 transition-colors" />
+                          </div>
                         </td>
 
                         {/* Column A: Donor Name */}
                         <td 
                           id={`cell-${tx.id}-donorName`}
+                          style={rowHeightStyle}
                           onClick={() => handleCellClick(tx.id, rowIndex, 'donorName', 'A')}
                           onDoubleClick={() => handleCellDoubleClick(tx.id, 'donorName')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${
+                          className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 cursor-cell relative select-none ${rowHeightClass} ${
                             selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
                           }`}
                         >
@@ -2460,13 +2786,16 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                               className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs"
                             />
                           ) : (
-                            <span className="font-semibold text-slate-800 dark:text-slate-100">
+                            <span className={`font-semibold text-slate-800 dark:text-slate-100 ${isExpandedRow ? 'whitespace-normal break-words leading-relaxed' : 'truncate block'}`}>
                               {tx.donorName || tx.donorNameUrdu || '---'}
                             </span>
                           )}
+                          {cellFormulas[`${tx.id}:donorName`] && (
+                            <span className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`Formula: ${cellFormulas[`${tx.id}:donorName`]}`} />
+                          )}
                           {selectedCell?.rowId === tx.id && selectedCell.colKey === 'donorName' && !editingCell && (
                             <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
+                            <button onClick={(e) => handleOpenExpandCell(e, tx.id, 'donorName')} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110 active:scale-95" title="Expand cell in full window"><Maximize2 size={10} /></button></>
                           )}
                         </td>
 
