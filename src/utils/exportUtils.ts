@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { Transaction, OrganizationConfig, FundCategory } from '../types/finance';
+import { Transaction, OrganizationConfig, FundCategory, getTransactionTargetAmount } from '../types/finance';
 import { convertNumberToUrduWords } from './urduNumberToWords';
 import { convertNumberToEnglishWords } from './englishNumberToWords';
 
@@ -13,13 +13,7 @@ export function exportTransactionsToExcel(
 ) {
   const rows = transactions.map((t, index) => {
     const months = t.monthsData || {};
-    const target = (t.targetAmount !== undefined && t.targetAmount > 0)
-      ? t.targetAmount
-      : (t.annuallyAmount && t.annuallyAmount > 0 
-          ? t.annuallyAmount 
-          : (t.quarterlyAmount && t.quarterlyAmount > 0 
-              ? t.quarterlyAmount * 4 
-              : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount)));
+    const target = getTransactionTargetAmount(t);
     const paid = Object.values(months).length > 0 
       ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
       : Number(t.amount || 0);
@@ -127,13 +121,7 @@ export function exportTransactionsToCSV(transactions: Transaction[], fileName: s
     headers.join(','),
     ...transactions.map((t, index) => {
       const months = t.monthsData || {};
-      const target = (t.targetAmount !== undefined && t.targetAmount > 0)
-        ? t.targetAmount
-        : (t.annuallyAmount && t.annuallyAmount > 0 
-            ? t.annuallyAmount 
-            : (t.quarterlyAmount && t.quarterlyAmount > 0 
-                ? t.quarterlyAmount * 4 
-                : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount)));
+      const target = getTransactionTargetAmount(t);
       const paid = Object.values(months).length > 0 
         ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
         : Number(t.amount || 0);
@@ -318,12 +306,7 @@ export function printSheetAsPDF(
   }
 
   const totalPledged = transactions.reduce((sum, t) => {
-    const tgt = t.annuallyAmount && t.annuallyAmount > 0 
-      ? t.annuallyAmount 
-      : (t.quarterlyAmount && t.quarterlyAmount > 0 
-          ? t.quarterlyAmount * 4 
-          : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
-    return sum + (Number(tgt) || 0);
+    return sum + getTransactionTargetAmount(t);
   }, 0);
 
   const totalPaidSum = transactions.reduce((sum, t) => {
@@ -340,11 +323,7 @@ export function printSheetAsPDF(
     ? `<tr><td colspan="17" style="text-align: center; padding: 24px; color: #64748b;">No records recorded in this sheet yet.</td></tr>`
     : transactions.map((t, index) => {
         const months = t.monthsData || {};
-        const tgt = t.annuallyAmount && t.annuallyAmount > 0 
-          ? t.annuallyAmount 
-          : (t.quarterlyAmount && t.quarterlyAmount > 0 
-              ? t.quarterlyAmount * 4 
-              : (t.monthlyAmount && t.monthlyAmount > 0 ? t.monthlyAmount * 12 : t.amount));
+        const tgt = getTransactionTargetAmount(t);
         const paid = Object.values(months).length > 0
           ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
           : Number(t.amount || 0);
@@ -361,9 +340,9 @@ export function printSheetAsPDF(
             <td style="padding: 4px 5px; font-family: monospace;">${t.phone || '---'}</td>
             <td style="padding: 4px 5px; color: #047857; font-weight: 600;">${t.sarparastAla || '---'}</td>
             <td style="padding: 4px 5px; color: #334155;">${t.profession || '---'}</td>
-            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.monthlyAmount ? Number(t.monthlyAmount).toLocaleString() : '-'}</td>
-            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? Number(t.quarterlyAmount).toLocaleString() : '-'}</td>
-            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.annuallyAmount ? Number(t.annuallyAmount).toLocaleString() : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.monthlyAmount ? String(t.monthlyAmount) : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.quarterlyAmount ? String(t.quarterlyAmount) : '-'}</td>
+            <td style="padding: 4px 5px; text-align: right; font-family: monospace;">${t.annuallyAmount ? String(t.annuallyAmount) : '-'}</td>
             <td style="padding: 4px 5px; text-align: right; font-family: monospace; font-weight: bold; color: #059669;">${Number(paid).toLocaleString()}</td>
             <td style="padding: 4px 5px; text-align: right; font-family: monospace; font-weight: bold; color: ${bal > 0 ? '#e11d48' : '#059669'};">${bal > 0 ? Number(bal).toLocaleString() : 'Paid ✓'}</td>
             <td style="padding: 4px 5px; text-align: center;">${t.paymentMode || 'Cash'}</td>

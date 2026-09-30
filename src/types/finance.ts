@@ -72,10 +72,10 @@ export interface Transaction {
   city?: string; // شہر
   reference?: string; // بتوسط (legacy/optional)
   preferredPeriod?: 'Monthly' | 'Quarterly' | 'Half Yearly' | 'Annually';
-  monthlyAmount?: number; // ماہانہ رقم
-  quarterlyAmount?: number; // سہ ماہی رقم
-  halfYearlyAmount?: number; // شش ماہی رقم
-  annuallyAmount?: number; // سالانہ رقم
+  monthlyAmount?: number | string; // ماہانہ رقم یا نشان (✓ / ✗ / custom text)
+  quarterlyAmount?: number | string; // سہ ماہی رقم یا نشان
+  halfYearlyAmount?: number | string; // شش ماہی رقم یا نشان
+  annuallyAmount?: number | string; // سالانہ رقم یا نشان
   targetAmount?: number; // معینہ ہدف (Target Money)
   monthsData?: MonthlyContributions; // 12-Month Contribution breakdown
   amount: number; // کل وصول شدہ رقم (Total Paid / Collected Amount)
@@ -174,4 +174,40 @@ export const COMMON_PROFESSIONS = [
   'Student / طالب علم',
   'Other / دیگر',
 ] as const;
+
+export const parseNumericAmount = (val: number | string | undefined | null): number => {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const str = String(val).trim();
+  if (str === '✓' || str === '✔' || str === '✗' || str === '❌' || str.toLowerCase() === 'x') return 0;
+  const cleaned = str.replace(/,/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+};
+
+export const isTickValue = (val: any): boolean => {
+  if (val === true) return true;
+  if (val === undefined || val === null) return false;
+  const s = String(val).trim().toLowerCase();
+  return s === '✓' || s === '✔' || s === 'tick' || s === 'true' || s === 'yes' || s === 'y' || s === 'ہاں' || s === 'صحیح';
+};
+
+export const isCrossValue = (val: any): boolean => {
+  if (val === false) return true;
+  if (val === undefined || val === null) return false;
+  const s = String(val).trim().toLowerCase();
+  return s === '✗' || s === '❌' || s === 'cross' || s === 'false' || s === 'no' || s === 'نہیں' || s === 'غلط' || s === 'x';
+};
+
+export const getTransactionTargetAmount = (tx: Partial<Transaction>): number => {
+  if (tx.targetAmount !== undefined && tx.targetAmount > 0) return tx.targetAmount;
+  const annual = parseNumericAmount(tx.annuallyAmount);
+  if (annual > 0) return annual;
+  const quarterly = parseNumericAmount(tx.quarterlyAmount);
+  if (quarterly > 0) return quarterly * 4;
+  const monthly = parseNumericAmount(tx.monthlyAmount);
+  if (monthly > 0) return monthly * 12;
+  return Number(tx.amount) || 0;
+};
+
 

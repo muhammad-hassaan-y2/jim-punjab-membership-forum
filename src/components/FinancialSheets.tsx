@@ -47,7 +47,19 @@ import {
   ChevronsUpDown,
   Rows3
 } from 'lucide-react';
-import { Transaction, SheetTab, FinancialProject, MONTH_KEYS, MONTH_LABELS, MonthKey, COMMON_PROFESSIONS } from '../types/finance';
+import { 
+  Transaction, 
+  SheetTab, 
+  FinancialProject, 
+  MONTH_KEYS, 
+  MONTH_LABELS, 
+  MonthKey, 
+  COMMON_PROFESSIONS,
+  getTransactionTargetAmount,
+  parseNumericAmount,
+  isTickValue,
+  isCrossValue
+} from '../types/finance';
 import { evaluateFormula, isFormula, EXCEL_FORMULA_DOCS, colLetterToIndex, indexToColLetter } from '../utils/formulaEngine';
 
 export type AccountingColKey = 
@@ -111,9 +123,9 @@ export const ACCOUNTING_COLUMNS: {
   { letter: 'E', key: 'receiptNo', titleEn: 'Receipt No', titleUr: 'رسید نمبر', width: 'w-24', align: 'center' },
   { letter: 'F', key: 'sarparastAla', titleEn: 'Sarparast-e-Ala', titleUr: 'سرپرست اعلیٰ', width: 'w-36' },
   { letter: 'G', key: 'profession', titleEn: 'Profession', titleUr: 'شعبہ / پیشہ', width: 'w-36' },
-  { letter: 'H', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ رقم', width: 'w-24', align: 'right' },
-  { letter: 'I', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی', width: 'w-24', align: 'right' },
-  { letter: 'J', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ', width: 'w-24', align: 'right' },
+  { letter: 'H', key: 'monthlyAmount', titleEn: 'Monthly', titleUr: 'ماہانہ (✓ / ✗)', width: 'w-24', align: 'center' },
+  { letter: 'I', key: 'quarterlyAmount', titleEn: 'Quarterly', titleUr: 'سہ ماہی (✓ / ✗)', width: 'w-24', align: 'center' },
+  { letter: 'J', key: 'annuallyAmount', titleEn: 'Annually', titleUr: 'سالانہ (✓ / ✗)', width: 'w-24', align: 'center' },
   { letter: 'K', key: 'jan', titleEn: 'Jan', titleUr: 'جنوری', width: 'w-20', align: 'right' },
   { letter: 'L', key: 'feb', titleEn: 'Feb', titleUr: 'فروری', width: 'w-20', align: 'right' },
   { letter: 'M', key: 'mar', titleEn: 'Mar', titleUr: 'مارچ', width: 'w-20', align: 'right' },
@@ -599,25 +611,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       return paid;
     }
     if (colKey === 'targetAmount') {
-      if (tx.targetAmount !== undefined && tx.targetAmount > 0) return tx.targetAmount;
-      return (tx.annuallyAmount && tx.annuallyAmount > 0)
-        ? tx.annuallyAmount
-        : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
-            ? tx.quarterlyAmount * 4
-            : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : (tx.amount || 0)));
+      return getTransactionTargetAmount(tx);
     }
     if (colKey === 'balance') {
-      const tgt = (tx.targetAmount !== undefined && tx.targetAmount > 0)
-        ? tx.targetAmount
-        : ((tx.annuallyAmount && tx.annuallyAmount > 0)
-            ? tx.annuallyAmount
-            : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
-                ? tx.quarterlyAmount * 4
-                : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : (tx.amount || 0))));
+      const tgt = getTransactionTargetAmount(tx);
       const paid = tx.monthsData && Object.values(tx.monthsData).length > 0
         ? Object.values(tx.monthsData).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
         : Number(tx.amount || 0);
-      return Math.max(0, (tgt || 0) - paid);
+      return Math.max(0, tgt - paid);
     }
     return (tx as any)[colKey] || '';
   };
@@ -653,11 +654,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
 
       // Status filter: Paid, Due/Arrears, Unpaid
       if (selectedAccountingStatus !== 'all') {
-        const target = (t.annuallyAmount && t.annuallyAmount > 0)
-          ? t.annuallyAmount
-          : ((t.quarterlyAmount && t.quarterlyAmount > 0)
-              ? t.quarterlyAmount * 4
-              : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount));
+        const target = getTransactionTargetAmount(t);
         const months = t.monthsData || {};
         const paid = Object.values(months).length > 0
           ? Object.values(months).reduce((s: number, v: any) => s + (Number(v) || 0), 0)
@@ -758,17 +755,11 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
     };
 
     filteredTransactions.forEach(t => {
-      monthlyCommitmentsSum += Number(t.monthlyAmount || 0);
-      quarterlyCommitmentsSum += Number(t.quarterlyAmount || 0);
-      annuallyCommitmentsSum += Number(t.annuallyAmount || 0);
+      monthlyCommitmentsSum += parseNumericAmount(t.monthlyAmount);
+      quarterlyCommitmentsSum += parseNumericAmount(t.quarterlyAmount);
+      annuallyCommitmentsSum += parseNumericAmount(t.annuallyAmount);
 
-      const target = (t.targetAmount !== undefined && t.targetAmount > 0)
-        ? t.targetAmount
-        : ((t.annuallyAmount && t.annuallyAmount > 0)
-            ? t.annuallyAmount
-            : ((t.quarterlyAmount && t.quarterlyAmount > 0)
-                ? t.quarterlyAmount * 4
-                : ((t.monthlyAmount && t.monthlyAmount > 0) ? t.monthlyAmount * 12 : t.amount)));
+      const target = getTransactionTargetAmount(t);
       totalPledged += Number(target || 0);
 
       const months = t.monthsData || {};
@@ -961,47 +952,71 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
       return;
     }
 
-    let finalVal: any = evalVal;
-    if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount', 'targetAmount'].includes(colKey as string)) {
-      finalVal = parseMoneyInput(evalVal);
+    if (['monthlyAmount', 'quarterlyAmount', 'halfYearlyAmount', 'annuallyAmount'].includes(colKey as string)) {
+      const trimmed = String(evalVal ?? '').trim();
+      const isTick = isTickValue(trimmed);
+      const isCross = isCrossValue(trimmed);
+
+      let finalVal: string | number = trimmed;
+      if (isTick) {
+        finalVal = '✓';
+      } else if (isCross) {
+        finalVal = '✗';
+      } else {
+        const parsedNum = parseMoneyInput(trimmed);
+        if (parsedNum > 0 && !isNaN(Number(trimmed.replace(/,/g, '')))) {
+          finalVal = parsedNum;
+        } else {
+          finalVal = trimmed;
+        }
+      }
+
+      updateCell(rowId, colKey as keyof Transaction, finalVal);
+
+      if (colKey === 'monthlyAmount') {
+        const num = typeof finalVal === 'number' ? finalVal : 0;
+        const tx = transactions.find(t => t.id === rowId);
+        updateTransaction(rowId, {
+          monthlyAmount: finalVal,
+          quarterlyAmount: num > 0 ? num * 3 : (tx?.quarterlyAmount || ''),
+          annuallyAmount: num > 0 ? num * 12 : (tx?.annuallyAmount || ''),
+          preferredPeriod: isTick ? 'Monthly' : (tx?.preferredPeriod || 'Monthly'),
+        });
+      } else if (colKey === 'quarterlyAmount') {
+        const num = typeof finalVal === 'number' ? finalVal : 0;
+        const tx = transactions.find(t => t.id === rowId);
+        updateTransaction(rowId, {
+          quarterlyAmount: finalVal,
+          monthlyAmount: num > 0 ? Math.round(num / 3) : (tx?.monthlyAmount || ''),
+          annuallyAmount: num > 0 ? num * 4 : (tx?.annuallyAmount || ''),
+          preferredPeriod: isTick ? 'Quarterly' : (tx?.preferredPeriod || 'Quarterly'),
+        });
+      } else if (colKey === 'annuallyAmount') {
+        const num = typeof finalVal === 'number' ? finalVal : 0;
+        const tx = transactions.find(t => t.id === rowId);
+        updateTransaction(rowId, {
+          annuallyAmount: finalVal,
+          targetAmount: num > 0 ? num : (tx?.targetAmount || 0),
+          monthlyAmount: num > 0 ? Math.round(num / 12) : (tx?.monthlyAmount || 0),
+          quarterlyAmount: num > 0 ? Math.round(num / 4) : (tx?.quarterlyAmount || 0),
+          preferredPeriod: isTick ? 'Annually' : (tx?.preferredPeriod || 'Annually'),
+        });
+      }
+
+      setEditingCell(null);
+      setFormulaBarValue(rawInput);
+      return;
     }
 
-    updateCell(rowId, colKey as keyof Transaction, finalVal);
-
-    if (colKey === 'monthlyAmount') {
-      const num = parseMoneyInput(evalVal);
-      const tx = transactions.find(t => t.id === rowId);
+    let finalVal: any = evalVal;
+    if (colKey === 'targetAmount') {
+      finalVal = parseMoneyInput(evalVal);
       updateTransaction(rowId, {
-        monthlyAmount: num,
-        quarterlyAmount: tx?.quarterlyAmount || (num > 0 ? num * 3 : 0),
-        annuallyAmount: tx?.annuallyAmount || (num > 0 ? num * 12 : 0),
-        preferredPeriod: 'Monthly',
+        targetAmount: finalVal,
+        annuallyAmount: finalVal > 0 ? finalVal : '',
       });
-    } else if (colKey === 'quarterlyAmount') {
-      const num = parseMoneyInput(evalVal);
-      const tx = transactions.find(t => t.id === rowId);
-      updateTransaction(rowId, {
-        quarterlyAmount: num,
-        monthlyAmount: tx?.monthlyAmount || (num > 0 ? Math.round(num / 3) : 0),
-        annuallyAmount: tx?.annuallyAmount || (num > 0 ? num * 4 : 0),
-        preferredPeriod: 'Quarterly',
-      });
-    } else if (colKey === 'annuallyAmount') {
-      const num = parseMoneyInput(evalVal);
-      const tx = transactions.find(t => t.id === rowId);
-      updateTransaction(rowId, {
-        annuallyAmount: num,
-        targetAmount: num,
-        monthlyAmount: tx?.monthlyAmount || (num > 0 ? Math.round(num / 12) : 0),
-        quarterlyAmount: tx?.quarterlyAmount || (num > 0 ? Math.round(num / 4) : 0),
-        preferredPeriod: 'Annually',
-      });
-    } else if (colKey === 'targetAmount') {
-      const num = parseMoneyInput(evalVal);
-      updateTransaction(rowId, {
-        targetAmount: num,
-        annuallyAmount: num,
-      });
+    } else {
+      updateCell(rowId, colKey as keyof Transaction, finalVal);
     }
 
     setEditingCell(null);
@@ -1012,15 +1027,179 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
   const handleQuickPayMonth = (tx: Transaction, monthKey?: MonthKey) => {
     const curMonthIndex = new Date().getMonth();
     const targetMonth: MonthKey = monthKey || (MONTH_KEYS[curMonthIndex] || 'jan');
-    const amt = tx.monthlyAmount && tx.monthlyAmount > 0 
-      ? tx.monthlyAmount 
-      : (tx.quarterlyAmount && tx.quarterlyAmount > 0 ? Math.round(tx.quarterlyAmount / 3) : 500);
+    const mNum = parseNumericAmount(tx.monthlyAmount);
+    const qNum = parseNumericAmount(tx.quarterlyAmount);
+    const amt = mNum > 0 
+      ? mNum 
+      : (qNum > 0 ? Math.round(qNum / 3) : 500);
     const updatedMonths = { ...(tx.monthsData || {}), [targetMonth]: amt };
     const totalSum = Object.values(updatedMonths).reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
     updateTransaction(tx.id, {
       monthsData: updatedMonths,
       amount: totalSum,
     });
+  };
+
+  // Helper to render Monthly, Quarterly, Annually cells with Tick/Cross options and custom text/amounts
+  const renderPledgePeriodCell = (
+    tx: Transaction,
+    colKey: 'monthlyAmount' | 'quarterlyAmount' | 'annuallyAmount',
+    colLetter: string,
+    rowIndex: number,
+    idx: number,
+    rowHeightClass: string,
+    rowHeightStyle?: React.CSSProperties
+  ) => {
+    const rawVal = tx[colKey];
+    const isSelected = selectedCell?.rowId === tx.id && selectedCell.colKey === colKey;
+    const isEditing = editingCell?.rowId === tx.id && editingCell.colKey === colKey;
+    const isTick = isTickValue(rawVal);
+    const isCross = isCrossValue(rawVal);
+    const numAmt = parseNumericAmount(rawVal);
+    const hasFormula = Boolean(cellFormulas[`${tx.id}:${colKey}`]);
+
+    return (
+      <td
+        key={colKey}
+        id={`cell-${tx.id}-${colKey}`}
+        style={rowHeightStyle}
+        onClick={() => handleCellClick(tx.id, rowIndex, colKey, colLetter)}
+        onDoubleClick={() => handleCellDoubleClick(tx.id, colKey)}
+        className={`p-1.5 border-r border-slate-200 dark:border-slate-800 text-center font-mono cursor-cell relative select-none group/pledge bg-blue-50/15 dark:bg-blue-950/10 ${rowHeightClass} ${
+          isSelected ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
+        }`}
+      >
+        {isEditing ? (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Quick 1-click Tick & Cross Popover Toolbar */}
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-1.5 py-1 rounded-md shadow-xl z-50 whitespace-nowrap">
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommitEdit(tx.id, colKey, '✓');
+                }}
+                className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-2xs transition-colors"
+                title="Tick (✓)"
+              >
+                <Check size={11} strokeWidth={3} /> Tick
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommitEdit(tx.id, colKey, '✗');
+                }}
+                className="px-2 py-0.5 bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-2xs transition-colors"
+                title="Cross (✗)"
+              >
+                <X size={11} strokeWidth={3} /> Cross
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommitEdit(tx.id, colKey, '');
+                }}
+                className="px-1.5 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 text-[10px] rounded transition-colors"
+                title="Clear value"
+              >
+                Clear
+              </button>
+            </div>
+
+            <input
+              type="text"
+              autoFocus
+              value={cellEditValue}
+              onChange={(e) => setCellEditValue(e.target.value)}
+              onBlur={() => handleCommitEdit(tx.id, colKey, cellEditValue)}
+              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, colKey, idx, cellEditValue)}
+              placeholder="✓, ✗, or write..."
+              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-center font-bold"
+            />
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center relative">
+            {isTick ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                <Check size={12} strokeWidth={3.5} className="text-emerald-600 dark:text-emerald-400" />
+                <span>✓</span>
+              </span>
+            ) : isCross ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-700 shadow-2xs">
+                <X size={12} strokeWidth={3.5} className="text-rose-600 dark:text-rose-400" />
+                <span>✗</span>
+              </span>
+            ) : numAmt > 0 ? (
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {numAmt.toLocaleString()}
+              </span>
+            ) : rawVal && String(rawVal).trim() !== '' ? (
+              <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[90px] block" title={String(rawVal)}>
+                {String(rawVal)}
+              </span>
+            ) : (
+              <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">—</span>
+            )}
+
+            {/* Quick 1-click Hover Action Buttons (for instant Tick/Cross without editing) */}
+            <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 opacity-0 group-hover/pledge:opacity-100 transition-opacity bg-white/90 dark:bg-slate-900/90 px-0.5 rounded backdrop-blur-2xs shadow-xs z-20">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCommitEdit(tx.id, colKey, isTick ? '' : '✓');
+                }}
+                className={`p-1 rounded transition-colors ${
+                  isTick 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'hover:bg-emerald-100 dark:hover:bg-emerald-950 text-emerald-600 dark:text-emerald-400'
+                }`}
+                title={isTick ? 'Remove Tick' : 'Tick (✓)'}
+              >
+                <Check size={11} strokeWidth={3} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCommitEdit(tx.id, colKey, isCross ? '' : '✗');
+                }}
+                className={`p-1 rounded transition-colors ${
+                  isCross 
+                    ? 'bg-rose-600 text-white' 
+                    : 'hover:bg-rose-100 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400'
+                }`}
+                title={isCross ? 'Remove Cross' : 'Cross (✗)'}
+              >
+                <X size={11} strokeWidth={3} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {hasFormula && (
+          <span className="absolute top-0.5 left-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`Formula: ${cellFormulas[`${tx.id}:${colKey}`]}`} />
+        )}
+
+        {isSelected && !isEditing && (
+          <>
+            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
+            <button
+              onClick={(e) => handleExpandCell(e, tx.id, colKey)}
+              className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110"
+              title="Expand cell"
+            >
+              <Eye size={10} />
+            </button>
+          </>
+        )}
+      </td>
+    );
   };
 
   // Helper to scroll active cell into view smoothly like Excel
@@ -2699,13 +2878,7 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                     const isRowSelected = selectedCell?.rowId === tx.id;
 
                     // Computed Target, Paid, and Balance for this row
-                    const annualTarget = (tx.targetAmount !== undefined && tx.targetAmount > 0)
-                      ? tx.targetAmount
-                      : ((tx.annuallyAmount && tx.annuallyAmount > 0)
-                          ? tx.annuallyAmount
-                          : ((tx.quarterlyAmount && tx.quarterlyAmount > 0)
-                              ? tx.quarterlyAmount * 4
-                              : ((tx.monthlyAmount && tx.monthlyAmount > 0) ? tx.monthlyAmount * 12 : tx.amount)));
+                    const annualTarget = getTransactionTargetAmount(tx);
                     
                     const months = tx.monthsData || {};
                     const totalRowPaid = Object.values(months).length > 0
@@ -2982,95 +3155,14 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                           )}
                         </td>
 
-                        {/* Column H: Monthly Pledged */}
-                        <td 
-                          id={`cell-${tx.id}-monthlyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'monthlyAmount', 'H')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'monthlyAmount')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'monthlyAmount' ? (
-                            <input
-                              type="number"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'monthlyAmount', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'monthlyAmount', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                            />
-                          ) : (
-                            <span className="font-semibold text-blue-700 dark:text-blue-400">
-                              {tx.monthlyAmount && tx.monthlyAmount > 0 ? Number(tx.monthlyAmount).toLocaleString() : '—'}
-                            </span>
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'monthlyAmount' && !editingCell && (
-                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
-                          )}
-                        </td>
+                        {/* Column H: Monthly Pledged (✓ / ✗ / amount / custom text) */}
+                        {renderPledgePeriodCell(tx, 'monthlyAmount', 'H', rowIndex, idx, rowHeightClass, rowHeightStyle)}
 
-                        {/* Column I: Quarterly Pledged */}
-                        <td 
-                          id={`cell-${tx.id}-quarterlyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'quarterlyAmount', 'I')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'quarterlyAmount')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'quarterlyAmount' ? (
-                            <input
-                              type="number"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'quarterlyAmount', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'quarterlyAmount', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                            />
-                          ) : (
-                            <span className="font-semibold text-indigo-700 dark:text-indigo-400">
-                              {tx.quarterlyAmount && tx.quarterlyAmount > 0 ? Number(tx.quarterlyAmount).toLocaleString() : '—'}
-                            </span>
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'quarterlyAmount' && !editingCell && (
-                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
-                          )}
-                        </td>
+                        {/* Column I: Quarterly Pledged (✓ / ✗ / amount / custom text) */}
+                        {renderPledgePeriodCell(tx, 'quarterlyAmount', 'I', rowIndex, idx, rowHeightClass, rowHeightStyle)}
 
-                        {/* Column J: Annually Pledged */}
-                        <td 
-                          id={`cell-${tx.id}-annuallyAmount`}
-                          onClick={() => handleCellClick(tx.id, rowIndex, 'annuallyAmount', 'J')}
-                          onDoubleClick={() => handleCellDoubleClick(tx.id, 'annuallyAmount')}
-                          className={`p-2 border-r border-slate-200 dark:border-slate-800 text-right font-mono cursor-cell relative select-none bg-blue-50/20 dark:bg-blue-950/10 ${
-                            selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' ? 'ring-2 ring-emerald-600 dark:ring-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/40 z-10' : ''
-                          }`}
-                        >
-                          {editingCell?.rowId === tx.id && editingCell.colKey === 'annuallyAmount' ? (
-                            <input
-                              type="number"
-                              autoFocus
-                              value={cellEditValue}
-                              onChange={(e) => setCellEditValue(e.target.value)}
-                              onBlur={() => handleCommitEdit(tx.id, 'annuallyAmount', cellEditValue)}
-                              onKeyDown={(e) => handleTemplateCellKeyDown(e, tx.id, 'annuallyAmount', idx, cellEditValue)}
-                              className="w-full p-1 bg-white dark:bg-slate-900 border border-emerald-500 rounded text-xs text-right font-mono"
-                            />
-                          ) : (
-                            <span className="font-bold text-slate-900 dark:text-white">
-                              {tx.annuallyAmount && tx.annuallyAmount > 0 ? Number(tx.annuallyAmount).toLocaleString() : '—'}
-                            </span>
-                          )}
-                          {selectedCell?.rowId === tx.id && selectedCell.colKey === 'annuallyAmount' && !editingCell && (
-                            <><div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-600 dark:bg-emerald-400 border border-white dark:border-slate-900 pointer-events-none z-20" />
-                            <button onClick={(e) => handleExpandCell(e, tx.id, selectedCell!.colKey)} className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center z-30 shadow-md transition-all hover:scale-110" title="Expand cell"><Eye size={10} /></button></>
-                          )}
-                        </td>
+                        {/* Column J: Annually Pledged (✓ / ✗ / amount / custom text) */}
+                        {renderPledgePeriodCell(tx, 'annuallyAmount', 'J', rowIndex, idx, rowHeightClass, rowHeightStyle)}
 
                         {/* Columns K through V: 12 Months Breakdown */}
                         {MONTH_KEYS.map((mKey, mIdx) => {
@@ -3912,6 +4004,36 @@ export const FinancialSheets: React.FC<FinancialSheetsProps> = ({ isStandaloneSh
                   {expandedCellEditValue.length} characters • {expandedCellEditValue.trim() ? expandedCellEditValue.trim().split(/\s+/).length : 0} words
                 </span>
               </div>
+
+              {['monthlyAmount', 'quarterlyAmount', 'annuallyAmount'].includes(expandedCell.colKey) && (
+                <div className="flex flex-wrap items-center gap-2 p-2.5 bg-blue-50/50 dark:bg-slate-800/80 border border-blue-200/60 dark:border-slate-700 rounded-xl">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Quick Selection:</span>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCellEditValue('✓')}
+                    className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs flex items-center gap-1 shadow-2xs transition-colors"
+                  >
+                    <Check size={13} strokeWidth={3} /> Tick (✓)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCellEditValue('✗')}
+                    className="px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-bold text-xs flex items-center gap-1 shadow-2xs transition-colors"
+                  >
+                    <X size={13} strokeWidth={3} /> Cross (✗)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCellEditValue('')}
+                    className="px-2.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg text-xs transition-colors"
+                  >
+                    Clear
+                  </button>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-auto">
+                    (Or type any amount / custom text below)
+                  </span>
+                </div>
+              )}
 
               <textarea
                 value={expandedCellEditValue}
